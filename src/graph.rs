@@ -4,7 +4,7 @@
 //! and `CompiledGraph` for building and executing agent workflows.
 
 use async_trait::async_trait;
-use petgraph::graph::{DiGraph, NodeIndex};
+use petgraph::stable_graph::{NodeIndex, StableGraph};
 use std::collections::HashMap;
 use std::fmt;
 use std::sync::Arc;
@@ -277,8 +277,8 @@ impl GraphBuilder {
             return Err(GraphError::NodeNotFound(entry));
         }
 
-        // Build the petgraph structure
-        let mut graph = DiGraph::new();
+        // Build the petgraph structure using StableGraph for stable node indices
+        let mut graph = StableGraph::new();
         let mut node_indices: HashMap<String, NodeIndex> = HashMap::new();
 
         // Add all nodes
@@ -322,9 +322,13 @@ impl GraphBuilder {
 }
 
 /// A compiled graph ready for execution
+///
+/// Uses `StableGraph` internally to ensure node indices remain stable
+/// across graph mutations, which is important for checkpointing and
+/// resuming workflows.
 #[derive(Clone)]
 pub struct CompiledGraph {
-    pub(crate) graph: DiGraph<GraphNode, GraphEdge>,
+    pub(crate) graph: StableGraph<GraphNode, GraphEdge>,
     pub(crate) node_indices: HashMap<String, NodeIndex>,
     pub(crate) edges: Vec<GraphEdge>,
     pub(crate) entry_point: String,
