@@ -322,6 +322,7 @@ impl GraphBuilder {
 }
 
 /// A compiled graph ready for execution
+#[derive(Clone)]
 pub struct CompiledGraph {
     pub(crate) graph: DiGraph<GraphNode, GraphEdge>,
     pub(crate) node_indices: HashMap<String, NodeIndex>,

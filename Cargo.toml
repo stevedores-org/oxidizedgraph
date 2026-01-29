@@ -59,3 +59,7 @@ path = "examples/rag_workflow.rs"
 [[example]]
 name = "streaming_events"
 path = "examples/streaming_events.rs"
+
+[[example]]
+name = "multi_agent"
+path = "examples/multi_agent.rs"

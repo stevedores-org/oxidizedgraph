@@ -32,6 +32,13 @@ pub use crate::events::{
     NodeEvent, StreamingRunner, StreamingRunResult, spawn_handler,
 };
 
+// Multi-graph orchestration
+pub use crate::orchestration::{
+    JoinStrategy, ParallelSubgraphs, SubgraphHandle, SubgraphNode, SubgraphResult,
+    SubgraphSpawner, clone_state, extract_context, merge_all_context, merge_context_keys,
+    merge_under_namespace,
+};
+
 // Built-in nodes
 pub use crate::nodes::{
     ConditionalNode, ContextRouterNode, DelayNode, EchoNode, FunctionNode, LLMConfig, LLMNode,

@@ -58,7 +58,7 @@ impl EventBus {
     pub fn subscribe(&self) -> EventReceiver {
         self.subscriber_count.fetch_add(1, Ordering::SeqCst);
         EventReceiver {
-            receiver: self.sender.subscribe(),
+            receiver: Some(self.sender.subscribe()),
             subscriber_count: self.subscriber_count.clone(),
         }
     }
@@ -91,7 +91,7 @@ impl std::fmt::Debug for EventBus {
 
 /// Receiver for events from an EventBus
 pub struct EventReceiver {
-    receiver: broadcast::Receiver<Event>,
+    receiver: Option<broadcast::Receiver<Event>>,
     subscriber_count: Arc<AtomicUsize>,
 }
 
@@ -101,8 +101,9 @@ impl EventReceiver {
     /// Returns `None` if the channel is closed.
     /// May skip events if the receiver falls behind (lagged).
     pub async fn recv(&mut self) -> Option<Event> {
+        let receiver = self.receiver.as_mut()?;
         loop {
-            match self.receiver.recv().await {
+            match receiver.recv().await {
                 Ok(event) => return Some(event),
                 Err(broadcast::error::RecvError::Lagged(skipped)) => {
                     tracing::warn!(skipped = skipped, "Event receiver lagged, some events were dropped");
@@ -117,23 +118,70 @@ impl EventReceiver {
     ///
     /// Returns `None` if no event is available or channel is closed.
     pub fn try_recv(&mut self) -> Option<Event> {
-        match self.receiver.try_recv() {
+        let receiver = self.receiver.as_mut()?;
+        match receiver.try_recv() {
             Ok(event) => Some(event),
             Err(_) => None,
         }
     }
 
     /// Receive events as a stream
+    ///
+    /// Consumes the receiver and returns a stream of events.
+    /// The subscriber count is decremented when the stream is dropped.
     #[cfg(feature = "stream")]
-    pub fn into_stream(self) -> impl futures::Stream<Item = Event> {
-        tokio_stream::wrappers::BroadcastStream::new(self.receiver)
-            .filter_map(|result| async move { result.ok() })
+    pub fn into_stream(mut self) -> impl futures::Stream<Item = Event> {
+        use tokio_stream::wrappers::errors::BroadcastStreamRecvError;
+        use tokio_stream::StreamExt;
+
+        // Take the receiver - this prevents the Drop impl from decrementing
+        let receiver = self.receiver.take().expect("receiver already taken");
+        let subscriber_count = self.subscriber_count.clone();
+
+        // Create a stream that decrements count when dropped
+        let stream = tokio_stream::wrappers::BroadcastStream::new(receiver)
+            .filter_map(|result: Result<Event, BroadcastStreamRecvError>| result.ok());
+
+        // Wrap in a struct that handles cleanup
+        EventStream {
+            inner: stream,
+            subscriber_count,
+        }
+    }
+}
+
+/// Stream wrapper that handles subscriber count cleanup
+#[cfg(feature = "stream")]
+struct EventStream<S> {
+    inner: S,
+    subscriber_count: Arc<AtomicUsize>,
+}
+
+#[cfg(feature = "stream")]
+impl<S: futures::Stream + Unpin> futures::Stream for EventStream<S> {
+    type Item = S::Item;
+
+    fn poll_next(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Option<Self::Item>> {
+        std::pin::Pin::new(&mut self.inner).poll_next(cx)
+    }
+}
+
+#[cfg(feature = "stream")]
+impl<S> Drop for EventStream<S> {
+    fn drop(&mut self) {
+        self.subscriber_count.fetch_sub(1, Ordering::SeqCst);
     }
 }
 
 impl Drop for EventReceiver {
     fn drop(&mut self) {
-        self.subscriber_count.fetch_sub(1, Ordering::SeqCst);
+        // Only decrement if we still have the receiver (wasn't converted to stream)
+        if self.receiver.is_some() {
+            self.subscriber_count.fetch_sub(1, Ordering::SeqCst);
+        }
     }
 }
 

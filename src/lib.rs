@@ -46,6 +46,7 @@ pub mod events;
 pub mod git;
 pub mod graph;
 pub mod nodes;
+pub mod orchestration;
 pub mod runner;
 pub mod state;
 
