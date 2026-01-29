@@ -51,6 +51,11 @@ impl NodeOutput {
         Self::Finish
     }
 
+    /// Alias for `finish()` - ends graph execution
+    pub fn end() -> Self {
+        Self::Finish
+    }
+
     /// Create a route output to a specific node
     pub fn route(target: impl Into<String>) -> Self {
         Self::Route(target.into())
