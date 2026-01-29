@@ -26,6 +26,12 @@ pub use crate::checkpoint::{
     Checkpoint, CheckpointConfig, Checkpointer, CheckpointingRunner, MemoryCheckpointer, RunResult,
 };
 
+// Events and streaming
+pub use crate::events::{
+    Event, EventBus, EventHandler, EventKind, GraphEvent, LoggingHandler, MetricsHandler,
+    NodeEvent, StreamingRunner, StreamingRunResult, spawn_handler,
+};
+
 // Built-in nodes
 pub use crate::nodes::{
     ConditionalNode, ContextRouterNode, DelayNode, EchoNode, FunctionNode, LLMConfig, LLMNode,

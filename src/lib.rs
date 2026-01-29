@@ -42,6 +42,7 @@
 // Core modules
 pub mod checkpoint;
 pub mod error;
+pub mod events;
 pub mod git;
 pub mod graph;
 pub mod nodes;

@@ -12,6 +12,7 @@ categories = ["asynchronous", "development-tools"]
 [features]
 default = []
 persistence = ["surrealdb"]
+stream = ["tokio-stream/sync"]
 
 [dependencies]
 petgraph = { version = "0.6", features = ["serde-1"] }
@@ -54,3 +55,7 @@ path = "examples/git_push.rs"
 [[example]]
 name = "rag_workflow"
 path = "examples/rag_workflow.rs"
+
+[[example]]
+name = "streaming_events"
+path = "examples/streaming_events.rs"
