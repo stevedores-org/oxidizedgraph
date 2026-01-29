@@ -51,6 +51,11 @@ impl NodeOutput {
         Self::Finish
     }
 
+    /// Alias for `finish()` - ends graph execution
+    pub fn end() -> Self {
+        Self::Finish
+    }
+
     /// Create a route output to a specific node
     pub fn route(target: impl Into<String>) -> Self {
         Self::Route(target.into())
@@ -449,6 +454,9 @@ mod tests {
         assert_eq!(output.target(), Some("next"));
 
         let output = NodeOutput::finish();
+        assert!(output.is_terminal());
+
+        let output = NodeOutput::end();
         assert!(output.is_terminal());
 
         let output = NodeOutput::route("target");
