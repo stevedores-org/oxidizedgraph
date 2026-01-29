@@ -133,7 +133,7 @@ async fn create_session(
         let mut s = AgentState::new();
         if let Some(obj) = initial.as_object() {
             for (k, v) in obj {
-                s.set(k.clone(), v.clone());
+                s.set_context(k.clone(), v.clone());
             }
         }
         s
@@ -141,7 +141,7 @@ async fn create_session(
         AgentState::new()
     };
 
-    let shared_state = SharedState::new(agent_state);
+    let shared_state = SharedState::new_shared(agent_state);
 
     let mut sessions = state.sessions.write().await;
     sessions.insert(session_id.clone(), shared_state);
@@ -163,9 +163,19 @@ async fn get_session(
 
     match sessions.get(&session_id) {
         Some(shared_state) => {
-            let agent_state = shared_state.read().await;
-            let data = agent_state.get_all();
-            Ok(Json(serde_json::to_value(data).unwrap_or_default()))
+            let agent_state = shared_state
+                .read()
+                .map_err(|e| {
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(ErrorResponse {
+                            error: format!("Lock error: {}", e),
+                            code: "LOCK_ERROR",
+                        }),
+                    )
+                })?;
+            let data = serde_json::to_value(&*agent_state).unwrap_or_default();
+            Ok(Json(data))
         }
         None => Err((
             StatusCode::NOT_FOUND,
@@ -189,8 +199,16 @@ async fn execute(
         Some(shared_state) => {
             // Update state with input
             {
-                let mut agent_state = shared_state.write().await;
-                agent_state.set("input".to_string(), req.input.clone());
+                let mut agent_state = shared_state.write().map_err(|e| {
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(ErrorResponse {
+                            error: format!("Lock error: {}", e),
+                            code: "LOCK_ERROR",
+                        }),
+                    )
+                })?;
+                agent_state.set_context("input", req.input.clone());
             }
 
             // In a real implementation, this would execute the graph
@@ -226,14 +244,22 @@ async fn checkpoint(
 
     match sessions.get(&session_id) {
         Some(shared_state) => {
-            let agent_state = shared_state.read().await;
+            let agent_state = shared_state.read().map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(ErrorResponse {
+                        error: format!("Lock error: {}", e),
+                        code: "LOCK_ERROR",
+                    }),
+                )
+            })?;
             let checkpoint_id = Uuid::new_v4().to_string();
 
             // In production, this would persist to storage
             let checkpoint_data = serde_json::json!({
                 "checkpoint_id": checkpoint_id,
                 "session_id": session_id,
-                "state": agent_state.get_all(),
+                "state": serde_json::to_value(&*agent_state).unwrap_or_default(),
                 "created_at": chrono::Utc::now().to_rfc3339(),
             });
 
@@ -260,18 +286,12 @@ async fn restore(
     let mut sessions = state.sessions.write().await;
 
     let restored_state = if let Some(state_data) = checkpoint.get("state") {
-        let mut s = AgentState::new();
-        if let Some(obj) = state_data.as_object() {
-            for (k, v) in obj {
-                s.set(k.clone(), v.clone());
-            }
-        }
-        s
+        serde_json::from_value(state_data.clone()).unwrap_or_else(|_| AgentState::new())
     } else {
         AgentState::new()
     };
 
-    sessions.insert(session_id.clone(), SharedState::new(restored_state));
+    sessions.insert(session_id.clone(), SharedState::new_shared(restored_state));
 
     info!("Restored session {} from checkpoint", session_id);
 
