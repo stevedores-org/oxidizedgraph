@@ -41,6 +41,7 @@
 
 // Core modules
 pub mod error;
+pub mod git;
 pub mod graph;
 pub mod nodes;
 pub mod runner;
