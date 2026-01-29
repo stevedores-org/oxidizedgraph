@@ -456,6 +456,9 @@ mod tests {
         let output = NodeOutput::finish();
         assert!(output.is_terminal());
 
+        let output = NodeOutput::end();
+        assert!(output.is_terminal());
+
         let output = NodeOutput::route("target");
         assert_eq!(output.target(), Some("target"));
     }
