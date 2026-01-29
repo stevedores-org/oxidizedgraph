@@ -1,0 +1,40 @@
+---
+# Deploy Cargo registries across clouds
+# Apply with: kubectl apply -f claims.yaml
+
+# Primary: Cloudflare (fastest, cheapest egress)
+apiVersion: stevedores.org/v1alpha1
+kind: CargoRegistry
+metadata:
+  name: stevedores-primary
+  namespace: default
+spec:
+  provider: cloudflare
+  registryName: stevedores
+  public: true  # Public sparse index
+
+---
+# Backup: AWS S3 (enterprise, compliance)
+apiVersion: stevedores.org/v1alpha1
+kind: CargoRegistry
+metadata:
+  name: stevedores-aws
+  namespace: default
+spec:
+  provider: aws
+  region: us-east-1
+  registryName: stevedores
+  public: false
+
+---
+# Mirror: GCP (multi-cloud redundancy)
+apiVersion: stevedores.org/v1alpha1
+kind: CargoRegistry
+metadata:
+  name: stevedores-gcp
+  namespace: default
+spec:
+  provider: gcp
+  region: us-central1
+  registryName: stevedores
+  public: false

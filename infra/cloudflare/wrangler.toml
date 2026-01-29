@@ -1,0 +1,32 @@
+# Cloudflare Worker: Cargo Sparse Registry
+name = "cargo-registry"
+main = "sparse-registry-worker.ts"
+compatibility_date = "2024-01-01"
+
+# Custom domain
+routes = [
+  { pattern = "crates.stevedores.org/*", zone_name = "stevedores.org" }
+]
+
+# R2 Buckets
+[[r2_buckets]]
+binding = "CRATES_BUCKET"
+bucket_name = "stevedores-crates"
+
+[[r2_buckets]]
+binding = "INDEX_BUCKET"
+bucket_name = "stevedores-index"
+
+# Optional: Auth token for publishing
+# [vars]
+# AUTH_TOKEN = "secret"  # Use wrangler secret put AUTH_TOKEN instead
+
+[env.production]
+routes = [
+  { pattern = "crates.stevedores.org/*", zone_name = "stevedores.org" }
+]
+
+[env.staging]
+routes = [
+  { pattern = "crates-staging.stevedores.org/*", zone_name = "stevedores.org" }
+]

@@ -1,0 +1,325 @@
+---
+# Crossplane Composite Resource Definition for Cargo Registry Infrastructure
+apiVersion: apiextensions.crossplane.io/v1
+kind: CompositeResourceDefinition
+metadata:
+  name: xcargoregistries.stevedores.org
+spec:
+  group: stevedores.org
+  names:
+    kind: XCargoRegistry
+    plural: xcargoregistries
+  claimNames:
+    kind: CargoRegistry
+    plural: cargoregistries
+  versions:
+    - name: v1alpha1
+      served: true
+      referenceable: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                provider:
+                  type: string
+                  enum: [aws, gcp, azure, cloudflare, github]
+                  description: Cloud provider for the registry
+                region:
+                  type: string
+                  default: us-east-1
+                registryName:
+                  type: string
+                  description: Name of the cargo registry
+                public:
+                  type: boolean
+                  default: false
+                  description: Whether the registry is publicly accessible
+              required:
+                - provider
+                - registryName
+            status:
+              type: object
+              properties:
+                registryUrl:
+                  type: string
+                indexUrl:
+                  type: string
+                status:
+                  type: string
+---
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: cargo-registry-aws
+  labels:
+    provider: aws
+spec:
+  compositeTypeRef:
+    apiVersion: stevedores.org/v1alpha1
+    kind: XCargoRegistry
+  resources:
+    # S3 Bucket for crate storage
+    - name: crate-storage
+      base:
+        apiVersion: s3.aws.upbound.io/v1beta1
+        kind: Bucket
+        spec:
+          forProvider:
+            region: us-east-1
+          providerConfigRef:
+            name: aws-provider
+      patches:
+        - fromFieldPath: spec.region
+          toFieldPath: spec.forProvider.region
+        - fromFieldPath: spec.registryName
+          toFieldPath: metadata.name
+          transforms:
+            - type: string
+              string:
+                fmt: "%s-crates"
+
+    # S3 Bucket for sparse index
+    - name: index-storage
+      base:
+        apiVersion: s3.aws.upbound.io/v1beta1
+        kind: Bucket
+        spec:
+          forProvider:
+            region: us-east-1
+            websiteConfiguration:
+              - indexDocument:
+                  suffix: config.json
+          providerConfigRef:
+            name: aws-provider
+      patches:
+        - fromFieldPath: spec.region
+          toFieldPath: spec.forProvider.region
+        - fromFieldPath: spec.registryName
+          toFieldPath: metadata.name
+          transforms:
+            - type: string
+              string:
+                fmt: "%s-index"
+
+    # CodeBuild project for CI/CD
+    - name: codebuild-project
+      base:
+        apiVersion: codebuild.aws.upbound.io/v1beta1
+        kind: Project
+        spec:
+          forProvider:
+            region: us-east-1
+            environment:
+              - computeType: BUILD_GENERAL1_SMALL
+                image: aws/codebuild/amazonlinux2-x86_64-standard:4.0
+                type: LINUX_CONTAINER
+                environmentVariable:
+                  - name: CARGO_REGISTRIES_STEVEDORES_INDEX
+                    value: "" # patched
+            source:
+              - type: GITHUB
+                buildspec: |
+                  version: 0.2
+                  phases:
+                    install:
+                      runtime-versions:
+                        rust: latest
+                    build:
+                      commands:
+                        - cargo build --release
+                        - cargo test
+                        - cargo publish --registry stevedores
+          providerConfigRef:
+            name: aws-provider
+      patches:
+        - fromFieldPath: spec.registryName
+          toFieldPath: metadata.name
+          transforms:
+            - type: string
+              string:
+                fmt: "%s-build"
+---
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: cargo-registry-gcp
+  labels:
+    provider: gcp
+spec:
+  compositeTypeRef:
+    apiVersion: stevedores.org/v1alpha1
+    kind: XCargoRegistry
+  resources:
+    # GCS Bucket for crate storage
+    - name: crate-storage
+      base:
+        apiVersion: storage.gcp.upbound.io/v1beta1
+        kind: Bucket
+        spec:
+          forProvider:
+            location: US
+            uniformBucketLevelAccess: true
+          providerConfigRef:
+            name: gcp-provider
+      patches:
+        - fromFieldPath: spec.registryName
+          toFieldPath: metadata.name
+          transforms:
+            - type: string
+              string:
+                fmt: "%s-crates"
+
+    # Artifact Registry for container images (optional)
+    - name: artifact-registry
+      base:
+        apiVersion: artifactregistry.gcp.upbound.io/v1beta1
+        kind: Repository
+        spec:
+          forProvider:
+            location: us-central1
+            format: DOCKER
+          providerConfigRef:
+            name: gcp-provider
+      patches:
+        - fromFieldPath: spec.registryName
+          toFieldPath: metadata.name
+
+    # Cloud Build trigger
+    - name: cloudbuild-trigger
+      base:
+        apiVersion: cloudbuild.gcp.upbound.io/v1beta1
+        kind: Trigger
+        spec:
+          forProvider:
+            filename: cloudbuild.yaml
+            github:
+              - owner: stevedores-org
+                name: "" # patched
+                push:
+                  - branch: main
+          providerConfigRef:
+            name: gcp-provider
+      patches:
+        - fromFieldPath: spec.registryName
+          toFieldPath: spec.forProvider.github[0].name
+---
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: cargo-registry-azure
+  labels:
+    provider: azure
+spec:
+  compositeTypeRef:
+    apiVersion: stevedores.org/v1alpha1
+    kind: XCargoRegistry
+  resources:
+    # Resource Group
+    - name: resource-group
+      base:
+        apiVersion: azure.upbound.io/v1beta1
+        kind: ResourceGroup
+        spec:
+          forProvider:
+            location: East US
+          providerConfigRef:
+            name: azure-provider
+      patches:
+        - fromFieldPath: spec.registryName
+          toFieldPath: metadata.name
+          transforms:
+            - type: string
+              string:
+                fmt: "rg-%s"
+
+    # Storage Account for crates
+    - name: storage-account
+      base:
+        apiVersion: storage.azure.upbound.io/v1beta1
+        kind: Account
+        spec:
+          forProvider:
+            resourceGroupNameSelector:
+              matchControllerRef: true
+            location: East US
+            accountTier: Standard
+            accountReplicationType: LRS
+            allowNestedItemsToBePublic: false
+          providerConfigRef:
+            name: azure-provider
+      patches:
+        - fromFieldPath: spec.registryName
+          toFieldPath: metadata.name
+          transforms:
+            - type: string
+              string:
+                fmt: "st%scrates"
+
+    # Blob Container
+    - name: blob-container
+      base:
+        apiVersion: storage.azure.upbound.io/v1beta1
+        kind: Container
+        spec:
+          forProvider:
+            storageAccountNameSelector:
+              matchControllerRef: true
+            containerAccessType: private
+          providerConfigRef:
+            name: azure-provider
+      patches:
+        - fromFieldPath: spec.registryName
+          toFieldPath: metadata.name
+---
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: cargo-registry-cloudflare
+  labels:
+    provider: cloudflare
+spec:
+  compositeTypeRef:
+    apiVersion: stevedores.org/v1alpha1
+    kind: XCargoRegistry
+  resources:
+    # R2 Bucket for crate storage
+    - name: r2-bucket
+      base:
+        apiVersion: r2.cloudflare.upbound.io/v1alpha1
+        kind: Bucket
+        spec:
+          forProvider:
+            accountId: "" # from secret
+            name: "" # patched
+          providerConfigRef:
+            name: cloudflare-provider
+      patches:
+        - fromFieldPath: spec.registryName
+          toFieldPath: spec.forProvider.name
+          transforms:
+            - type: string
+              string:
+                fmt: "%s-crates"
+
+    # Worker for sparse registry API
+    - name: worker
+      base:
+        apiVersion: workers.cloudflare.upbound.io/v1alpha1
+        kind: Script
+        spec:
+          forProvider:
+            accountId: "" # from secret
+            name: "" # patched
+            content: "" # from ConfigMap
+          providerConfigRef:
+            name: cloudflare-provider
+      patches:
+        - fromFieldPath: spec.registryName
+          toFieldPath: spec.forProvider.name
+          transforms:
+            - type: string
+              string:
+                fmt: "%s-registry"
