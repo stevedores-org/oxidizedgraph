@@ -1,0 +1,45 @@
+[package]
+name = "oxidizedgraph"
+version = "0.1.0"
+edition = "2021"
+authors = ["stevedores-org"]
+description = "A humble attempt at LangGraph in Rust - R-LangGraph framework for building AI agent workflows"
+license = "Apache-2.0"
+repository = "https://github.com/stevedores-org/oxidizedgraph"
+keywords = ["langgraph", "ai", "agents", "workflow", "graph"]
+categories = ["asynchronous", "development-tools"]
+
+[dependencies]
+petgraph = "0.6"
+tokio = { version = "1", features = ["full"] }
+tokio-stream = "0.1"
+async-trait = "0.1"
+futures = "0.3"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+reqwest = { version = "0.12", features = ["json"] }
+thiserror = "2"
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+derive_builder = "0.20"
+crossbeam-channel = "0.5"
+git2 = "0.19"
+
+[dev-dependencies]
+tokio-test = "0.4"
+mockall = "0.13"
+
+[[example]]
+name = "simple_workflow"
+path = "examples/simple_workflow.rs"
+
+[[example]]
+name = "react_agent"
+path = "examples/react_agent.rs"
+
+[[example]]
+name = "git_push"
+path = "examples/git_push.rs"

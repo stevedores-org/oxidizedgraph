@@ -1,21 +1,30 @@
-# Dependencies
-node_modules/
-
-# Build outputs
-dist/
-.wrangler/
-
-# Environment
-.env
-.env.local
-.dev.vars
+# Rust build artifacts
+target/
+Cargo.lock
 
 # IDE
 .idea/
 .vscode/
 *.swp
 *.swo
+*.iml
 
 # OS
 .DS_Store
 Thumbs.db
+
+# Environment
+.env
+.env.local
+.dev.vars
+
+# Editor backup files
+*~
+\#*\#
+
+# Debug
+*.pdb
+
+# Coverage reports
+*.profraw
+coverage/
