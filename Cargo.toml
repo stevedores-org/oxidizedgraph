@@ -9,8 +9,12 @@ repository = "https://github.com/stevedores-org/oxidizedgraph"
 keywords = ["langgraph", "ai", "agents", "workflow", "graph"]
 categories = ["asynchronous", "development-tools"]
 
+[features]
+default = []
+persistence = ["surrealdb"]
+
 [dependencies]
-petgraph = "0.6"
+petgraph = { version = "0.6", features = ["serde-1"] }
 tokio = { version = "1", features = ["full"] }
 tokio-stream = "0.1"
 async-trait = "0.1"
@@ -28,6 +32,9 @@ derive_builder = "0.20"
 crossbeam-channel = "0.5"
 git2 = "0.19"
 
+# Persistence layer (optional)
+surrealdb = { version = "2", optional = true, features = ["kv-mem"] }
+
 [dev-dependencies]
 tokio-test = "0.4"
 mockall = "0.13"
@@ -43,3 +50,7 @@ path = "examples/react_agent.rs"
 [[example]]
 name = "git_push"
 path = "examples/git_push.rs"
+
+[[example]]
+name = "rag_workflow"
+path = "examples/rag_workflow.rs"

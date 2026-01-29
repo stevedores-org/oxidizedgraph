@@ -40,6 +40,7 @@
 #![warn(missing_docs)]
 
 // Core modules
+pub mod checkpoint;
 pub mod error;
 pub mod git;
 pub mod graph;

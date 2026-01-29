@@ -21,6 +21,11 @@ pub use crate::graph::{
 // Execution
 pub use crate::runner::{GraphRunner, RunnerConfig, Runtime};
 
+// Checkpointing
+pub use crate::checkpoint::{
+    Checkpoint, CheckpointConfig, Checkpointer, CheckpointingRunner, MemoryCheckpointer, RunResult,
+};
+
 // Built-in nodes
 pub use crate::nodes::{
     ConditionalNode, ContextRouterNode, DelayNode, EchoNode, FunctionNode, LLMConfig, LLMNode,
