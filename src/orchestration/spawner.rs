@@ -1,5 +1,6 @@
 //! Dynamic subgraph spawner
 
+use futures::StreamExt;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use tracing::{debug, info};
@@ -211,23 +212,25 @@ impl<'a> SpawnBuilder<'a> {
     }
 
     /// Wait for the first subgraph to complete (race)
-    pub async fn join_first(self) -> Option<SubgraphResult> {
+    pub async fn join_first(mut self) -> Option<SubgraphResult> {
         if self.handles.is_empty() {
             return None;
         }
 
-        // Convert to pinned futures we can select on
-        let futures: Vec<_> = self.handles
-            .into_iter()
-            .map(|h| Box::pin(h.join()))
-            .collect();
+        let result = {
+            let mut futures = futures::stream::FuturesUnordered::new();
+            for handle in &mut self.handles {
+                futures.push(handle);
+            }
+            futures.next().await
+        };
 
-        let (result, _, _remaining) = futures::future::select_all(futures).await;
+        // Abort remaining
+        for handle in self.handles {
+            handle.abort();
+        }
 
-        // Note: Remaining futures will continue running but their results will be ignored.
-        // They'll be cleaned up when the futures are dropped.
-
-        Some(result)
+        result
     }
 }
 
