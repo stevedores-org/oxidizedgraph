@@ -238,41 +238,79 @@ impl ParallelSubgraphs {
                 vec![result]
             }
             JoinStrategy::FailFast => {
+                if handles.is_empty() {
+                    return Vec::new();
+                }
+
+                let mut futures: Vec<_> = handles
+                    .into_iter()
+                    .map(|(id, h)| {
+                        let id_clone = id.clone();
+                        Box::pin(async move {
+                            let result = h.await.unwrap_or_else(|e| SubgraphResult::Failed {
+                                subgraph_id: id_clone.clone(),
+                                error: crate::error::RuntimeError::InvalidState(format!(
+                                    "Task panicked: {}",
+                                    e
+                                )),
+                            });
+                            (id_clone, result)
+                        })
+                    })
+                    .collect();
+
                 let mut results = Vec::new();
-                for (id, handle) in handles {
-                    let result = handle.await.unwrap_or_else(|e| SubgraphResult::Failed {
-                        subgraph_id: id.clone(),
-                        error: crate::error::RuntimeError::InvalidState(format!(
-                            "Task panicked: {}",
-                            e
-                        )),
-                    });
+
+                while !futures.is_empty() {
+                    let ((id, result), _, remaining) = futures::future::select_all(futures).await;
+                    futures = remaining;
+
                     let is_failed = result.is_failed();
                     results.push((id, result));
+
                     if is_failed {
-                        break;
+                        return results;
                     }
                 }
                 results
             }
             JoinStrategy::WaitN(n) => {
+                if handles.is_empty() {
+                    return Vec::new();
+                }
+
+                let mut futures: Vec<_> = handles
+                    .into_iter()
+                    .map(|(id, h)| {
+                        let id_clone = id.clone();
+                        Box::pin(async move {
+                            let result = h.await.unwrap_or_else(|e| SubgraphResult::Failed {
+                                subgraph_id: id_clone.clone(),
+                                error: crate::error::RuntimeError::InvalidState(format!(
+                                    "Task panicked: {}",
+                                    e
+                                )),
+                            });
+                            (id_clone, result)
+                        })
+                    })
+                    .collect();
+
                 let mut results = Vec::new();
-                let mut completed = 0;
-                for (id, handle) in handles {
-                    if completed >= *n {
-                        break;
-                    }
-                    let result = handle.await.unwrap_or_else(|e| SubgraphResult::Failed {
-                        subgraph_id: id.clone(),
-                        error: crate::error::RuntimeError::InvalidState(format!(
-                            "Task panicked: {}",
-                            e
-                        )),
-                    });
+                let mut completed_count = 0;
+
+                while !futures.is_empty() {
+                    let ((id, result), _, remaining) = futures::future::select_all(futures).await;
+                    futures = remaining;
+
                     if result.is_completed() {
-                        completed += 1;
+                        completed_count += 1;
                     }
                     results.push((id, result));
+
+                    if completed_count >= *n {
+                        return results;
+                    }
                 }
                 results
             }

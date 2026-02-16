@@ -115,6 +115,15 @@ impl GraphRunner {
         );
 
         loop {
+            // Check for END node
+            if current_node == transitions::END {
+                info!(iterations = iterations, "Graph execution completed");
+                let guard = state
+                    .read()
+                    .map_err(|e| RuntimeError::InvalidState(e.to_string()))?;
+                return Ok(guard.clone());
+            }
+
             // Check iteration limit
             if iterations >= self.config.max_iterations {
                 warn!(
@@ -123,15 +132,6 @@ impl GraphRunner {
                     "Maximum iterations exceeded"
                 );
                 return Err(RuntimeError::RecursionLimit(self.config.max_iterations));
-            }
-
-            // Check for END node
-            if current_node == transitions::END {
-                info!(iterations = iterations, "Graph execution completed");
-                let guard = state
-                    .read()
-                    .map_err(|e| RuntimeError::InvalidState(e.to_string()))?;
-                return Ok(guard.clone());
             }
 
             // Get the current node
