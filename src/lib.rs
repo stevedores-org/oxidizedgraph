@@ -50,6 +50,22 @@ pub mod orchestration;
 pub mod runner;
 pub mod state;
 
+// Deprecated modules — will be removed in v0.3.0
+// These contain an unused generic implementation that predates the
+// current NodeExecutor + AgentState architecture. See docs/ADR-001.
+#[deprecated(
+    since = "0.2.0",
+    note = "Use types from the `graph` module instead. Will be removed in 0.3.0."
+)]
+#[allow(deprecated)]
+pub mod edge;
+#[deprecated(
+    since = "0.2.0",
+    note = "Use `NodeExecutor` from the `graph` module instead. Will be removed in 0.3.0."
+)]
+#[allow(deprecated)]
+pub mod node;
+
 /// Convenient re-exports for common usage
 pub mod prelude;
 
