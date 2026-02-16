@@ -211,7 +211,7 @@ impl<'a> SpawnBuilder<'a> {
         results
     }
 
-    /// Wait for the first subgraph to complete (race)
+    /// Wait for the first subgraph to complete (race). Remaining subgraphs will be aborted.
     pub async fn join_first(mut self) -> Option<SubgraphResult> {
         if self.handles.is_empty() {
             return None;

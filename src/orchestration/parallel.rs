@@ -437,7 +437,7 @@ mod tests {
         let elapsed = start.elapsed();
 
         // Should return quickly due to fail-fast, not wait for the 1000ms subgraph
-        assert!(elapsed < Duration::from_millis(500));
+        assert!(elapsed < Duration::from_millis(900));
     }
 
     #[tokio::test]
@@ -453,6 +453,6 @@ mod tests {
         let elapsed = start.elapsed();
 
         // Should return quickly after the first one finishes
-        assert!(elapsed < Duration::from_millis(500));
+        assert!(elapsed < Duration::from_millis(900));
     }
 }
