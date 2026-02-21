@@ -282,7 +282,11 @@ impl<C: Checkpointer> CheckpointingRunner<C> {
                     let current_state = state
                         .read()
                         .map_err(|e| RuntimeError::InvalidState(e.to_string()))?;
-                    match self.graph.get_next_node(&current_node, &current_state) {
+                    match self.graph.get_next_node_for_transition(
+                        &current_node,
+                        &current_state,
+                        transitions::CONTINUE,
+                    ) {
                         Some(next) => {
                             debug!(node_id = %current_node, next = %next, "Following graph edge");
                             next
