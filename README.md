@@ -180,4 +180,4 @@ Apache-2.0 License - see LICENSE file.
 
 ## Contributing
 
-Contributions welcome! Please open an issue or PR.
+See `CONTRIBUTING.md` for a practical start-contributing map and workflow.
