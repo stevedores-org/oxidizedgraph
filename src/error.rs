@@ -36,6 +36,15 @@ pub enum GraphError {
     /// Invalid graph configuration
     #[error("Invalid graph configuration: {0}")]
     InvalidConfiguration(String),
+
+    /// Two or more edges share the same (from, transition_key) pair
+    #[error("Duplicate transition key '{key}' on edges from node '{from}'")]
+    DuplicateTransitionKey {
+        /// Source node
+        from: String,
+        /// The conflicting transition key
+        key: String,
+    },
 }
 
 /// Errors that can occur during node execution

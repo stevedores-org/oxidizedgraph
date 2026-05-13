@@ -5,7 +5,7 @@
 
 use async_trait::async_trait;
 use petgraph::stable_graph::{NodeIndex, StableGraph};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::sync::Arc;
 
@@ -333,6 +333,20 @@ impl GraphBuilder {
             return Err(GraphError::NodeNotFound(entry));
         }
 
+        // Reject duplicate (from, transition_key) pairs — they would make
+        // key-based routing non-deterministic.
+        let mut seen_keys: HashSet<(&str, &str)> = HashSet::new();
+        for edge in &self.edges {
+            if let Some(key) = edge.transition_key.as_deref() {
+                if !seen_keys.insert((edge.from.as_str(), key)) {
+                    return Err(GraphError::DuplicateTransitionKey {
+                        from: edge.from.clone(),
+                        key: key.to_string(),
+                    });
+                }
+            }
+        }
+
         // Build the petgraph structure using StableGraph for stable node indices
         let mut graph = StableGraph::new();
         let mut node_indices: HashMap<String, NodeIndex> = HashMap::new();
@@ -411,48 +425,51 @@ impl CompiledGraph {
         self.get_next_node_with_key(from, None, state)
     }
 
-    /// Get the next node ID based on edges from the given node with optional key-based routing
+    /// Get the next node ID with optional key-based edge selection.
     ///
     /// # Arguments
-    /// * `from` - The source node ID
-    /// * `key` - Optional transition key to use for deterministic routing
-    /// * `state` - The current agent state (used for conditional edge routing if no key matches)
+    /// * `from` - The source node ID.
+    /// * `key` - Optional transition key. When `Some`, only an edge whose
+    ///   `transition_key` matches is considered; no fallback is attempted.
+    /// * `state` - The current agent state, used by conditional edge routers.
+    ///
+    /// # Semantics
+    /// - **Direct + key**: returns the edge's target. Fully deterministic.
+    /// - **Conditional + key**: the key selects *which* router runs; the
+    ///   router's return value is still the destination, so the result
+    ///   depends on `state`. The key makes router selection deterministic,
+    ///   not the destination.
+    /// - **`key = None`**: legacy behavior — picks the first edge from
+    ///   `from` in insertion order, regardless of whether it carries a key.
+    ///
+    /// `GraphBuilder::compile` rejects duplicate `(from, key)` pairs, so a
+    /// matching key resolves to at most one edge.
     ///
     /// # Returns
-    /// Returns the target node ID if found. If a key is provided, uses key-based matching first.
-    /// Falls back to the first matching edge (direct or conditional) if no key matches.
-    ///
-    /// # Errors
-    /// Returns None if no matching edge is found.
+    /// `Some(target)` when an edge resolves; `None` when:
+    /// - a `key` was supplied and no edge from `from` has that key, or
+    /// - no edges from `from` exist.
     pub fn get_next_node_with_key(&self, from: &str, key: Option<&str>, state: &AgentState) -> Option<String> {
-        // First, try to find an edge with matching key if provided
         if let Some(transition_key) = key {
             for edge in &self.edges {
                 if edge.from == from && edge.transition_key.as_deref() == Some(transition_key) {
-                    match &edge.edge_type {
-                        EdgeType::Direct => return Some(edge.to.clone()),
-                        EdgeType::Conditional(router) => {
-                            let target = router(state);
-                            return Some(target);
-                        }
-                    }
+                    return match &edge.edge_type {
+                        EdgeType::Direct => Some(edge.to.clone()),
+                        EdgeType::Conditional(router) => Some(router(state)),
+                    };
                 }
             }
-            // Key was provided but not found - this is a configuration error
-            // Return None to signal missing key error
+            // Key supplied but no matching edge — caller passed a key that
+            // wasn't registered. Treated as a configuration error: no fallback.
             return None;
         }
 
-        // Fallback to first matching edge without key (backward compatible)
         for edge in &self.edges {
             if edge.from == from {
-                match &edge.edge_type {
-                    EdgeType::Direct => return Some(edge.to.clone()),
-                    EdgeType::Conditional(router) => {
-                        let target = router(state);
-                        return Some(target);
-                    }
-                }
+                return match &edge.edge_type {
+                    EdgeType::Direct => Some(edge.to.clone()),
+                    EdgeType::Conditional(router) => Some(router(state)),
+                };
             }
         }
         None
@@ -835,5 +852,31 @@ mod tests {
 
         assert_eq!(result1, result2);
         assert_eq!(result1, Some("target_a".to_string()));
+    }
+
+    #[test]
+    fn test_duplicate_transition_key_rejected_at_compile() {
+        let result = GraphBuilder::new()
+            .add_node(TestNode {
+                id: "start".to_string(),
+            })
+            .add_node(TestNode {
+                id: "a".to_string(),
+            })
+            .add_node(TestNode {
+                id: "b".to_string(),
+            })
+            .set_entry_point("start")
+            .add_edge_with_key("start", "a", "same_key")
+            .add_edge_with_key("start", "b", "same_key")
+            .compile();
+
+        match result {
+            Err(GraphError::DuplicateTransitionKey { from, key }) => {
+                assert_eq!(from, "start");
+                assert_eq!(key, "same_key");
+            }
+            other => panic!("expected DuplicateTransitionKey, got {:?}", other.map(|_| "Ok")),
+        }
     }
 }
