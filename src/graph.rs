@@ -33,6 +33,8 @@ pub enum NodeOutput {
     Finish,
     /// Route to a specific node
     Route(String),
+    /// Follow an outgoing edge with the specified transition key
+    Transition(String),
 }
 
 impl NodeOutput {
@@ -61,6 +63,11 @@ impl NodeOutput {
         Self::Route(target.into())
     }
 
+    /// Create a transition output that follows a keyed graph edge
+    pub fn transition(key: impl Into<String>) -> Self {
+        Self::Transition(key.into())
+    }
+
     /// Check if this output signals completion
     pub fn is_terminal(&self) -> bool {
         matches!(self, Self::Finish)
@@ -69,7 +76,7 @@ impl NodeOutput {
     /// Get the target node name if this is a routing output
     pub fn target(&self) -> Option<&str> {
         match self {
-            Self::Continue(Some(s)) | Self::Route(s) => Some(s),
+            Self::Continue(Some(s)) | Self::Route(s) | Self::Transition(s) => Some(s),
             _ => None,
         }
     }
@@ -330,8 +337,11 @@ impl GraphBuilder {
     where
         F: Fn(&AgentState) -> String + Send + Sync + 'static,
     {
-        self.edges
-            .push(GraphEdge::conditional_with_key(from, transition_key, router));
+        self.edges.push(GraphEdge::conditional_with_key(
+            from,
+            transition_key,
+            router,
+        ));
         self
     }
 
@@ -558,6 +568,9 @@ mod tests {
 
         let output = NodeOutput::route("target");
         assert_eq!(output.target(), Some("target"));
+
+        let output = NodeOutput::transition("success");
+        assert_eq!(output.target(), Some("success"));
     }
 
     #[test]

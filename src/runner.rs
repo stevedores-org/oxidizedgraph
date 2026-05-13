@@ -101,10 +101,7 @@ impl GraphRunner {
     }
 
     /// Main execution loop
-    async fn run_loop(
-        &self,
-        state: Arc<RwLock<AgentState>>,
-    ) -> Result<AgentState, RuntimeError> {
+    async fn run_loop(&self, state: Arc<RwLock<AgentState>>) -> Result<AgentState, RuntimeError> {
         let mut current_node = self.graph.entry_point().to_string();
         let mut iterations: u32 = 0;
 
@@ -195,6 +192,29 @@ impl GraphRunner {
                 NodeOutput::Route(target) => {
                     debug!(node_id = %current_node, target = %target, "Node routing to target");
                     target.clone()
+                }
+                NodeOutput::Transition(key) => {
+                    let current_state = state
+                        .read()
+                        .map_err(|e| RuntimeError::InvalidState(e.to_string()))?;
+                    match self.graph.get_next_node_for_transition(
+                        &current_node,
+                        &current_state,
+                        key,
+                    ) {
+                        Some(next) => {
+                            debug!(node_id = %current_node, transition = %key, next = %next, "Following keyed graph edge");
+                            next
+                        }
+                        None => {
+                            debug!(
+                                node_id = %current_node,
+                                transition = %key,
+                                "No outgoing edge for transition, ending execution"
+                            );
+                            transitions::END.to_string()
+                        }
+                    }
                 }
             };
 
@@ -367,6 +387,62 @@ mod tests {
         assert_eq!(
             result.get_context::<String>("visited"),
             Some("abc".to_string())
+        );
+    }
+
+    #[tokio::test]
+    async fn test_transition_key_routing() {
+        struct TransitionNode;
+        struct MarkerNode {
+            id: String,
+        }
+
+        #[async_trait]
+        impl NodeExecutor for TransitionNode {
+            fn id(&self) -> &str {
+                "router"
+            }
+
+            async fn execute(&self, _state: SharedState) -> Result<NodeOutput, NodeError> {
+                Ok(NodeOutput::transition("success"))
+            }
+        }
+
+        #[async_trait]
+        impl NodeExecutor for MarkerNode {
+            fn id(&self) -> &str {
+                &self.id
+            }
+
+            async fn execute(&self, state: SharedState) -> Result<NodeOutput, NodeError> {
+                let mut guard = state
+                    .write()
+                    .map_err(|e| NodeError::execution_failed(e.to_string()))?;
+                guard.set_context("visited", self.id.clone());
+                Ok(NodeOutput::finish())
+            }
+        }
+
+        let graph = GraphBuilder::new()
+            .add_node(TransitionNode)
+            .add_node(MarkerNode {
+                id: "success_handler".to_string(),
+            })
+            .add_node(MarkerNode {
+                id: "error_handler".to_string(),
+            })
+            .set_entry_point("router")
+            .add_edge_with_key("router", "success_handler", "success")
+            .add_edge_with_key("router", "error_handler", "error")
+            .compile()
+            .unwrap();
+
+        let runner = GraphRunner::with_defaults(graph);
+        let result = runner.invoke(AgentState::new()).await.unwrap();
+
+        assert_eq!(
+            result.get_context::<String>("visited"),
+            Some("success_handler".to_string())
         );
     }
 
