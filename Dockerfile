@@ -1,3 +1,5 @@
+# Legacy image build. Prefer Nix OCI: `nix build .#server-image` — see docs/DEPLOY_GKE.md.
+#
 # Build stage
 FROM rust:1.83-slim-bookworm AS builder
 

@@ -1,6 +1,6 @@
 # Rust build artifacts
 target/
-Cargo.lock
+result
 
 # IDE
 .idea/
@@ -28,3 +28,6 @@ Thumbs.db
 # Coverage reports
 *.profraw
 coverage/
+
+# Local scratch (nested git clone)
+gke-tf-bootstrap/

@@ -178,6 +178,17 @@ cargo run --example react_agent
 
 Apache-2.0 License - see LICENSE file.
 
+## Deploy (OCI + GKE)
+
+Container images are built with **Nix** (`flake.nix`) and published via `dockworker.toml` to `ghcr.io/stevedores-org/oxidizedgraph/server`. Kubernetes manifests live under `deploy/` (Kustomize base + GKE Autopilot overlay).
+
+```bash
+just image          # nix build .#server-image
+just deploy-gke     # kubectl apply -k deploy/overlays/gke-autopilot
+```
+
+See [docs/DEPLOY_GKE.md](docs/DEPLOY_GKE.md). The root `Dockerfile` is legacy; prefer the Nix path above.
+
 ## Contributing
 
 Contributions welcome! Please open an issue or PR.

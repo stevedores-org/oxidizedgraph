@@ -1,0 +1,16 @@
+# OCI packaging: nix builds image tarballs -> skopeo pushes to registry.
+# See docs/DEPLOY_GKE.md
+
+version = 1
+flake = ".#"
+
+[[images]]
+name = "oxidizedgraph/server"
+nix_output = "server-image"
+push = true
+
+[registry]
+default = "ghcr.io/stevedores-org"
+
+[transport]
+tool = "skopeo"

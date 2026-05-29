@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: oxidizedgraph
+  namespace: oxidizedgraph
+  labels:
+    app.kubernetes.io/name: oxidizedgraph
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: oxidizedgraph
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
