@@ -1,6 +1,9 @@
 # Rust build artifacts
 target/
+# Nix build outputs (`nix build` writes `result`; chained or per-output
+# builds produce `result-1`, `result-bin`, etc.).
 result
+result-*
 
 # IDE
 .idea/
