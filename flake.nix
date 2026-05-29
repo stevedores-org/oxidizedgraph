@@ -22,6 +22,7 @@
         };
 
         craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain;
+        imageTag = (builtins.fromTOML (builtins.readFile ./Cargo.toml)).package.version;
 
         commonArgs = {
           src = craneLib.cleanCargoSource ./.;
@@ -40,8 +41,6 @@
           pname = "oxidizedgraph-server";
           cargoExtraArgs = "--bin oxidizedgraph-server";
         });
-
-        imageTag = "0.2.0";
 
         server-image = pkgs.dockerTools.buildLayeredImage {
           name = "oxidizedgraph/server";
@@ -83,6 +82,7 @@
             skopeo
             kubectl
             kustomize
+            kubeconform
             just
             git
           ];
@@ -91,6 +91,7 @@
             echo "oxidizedgraph dev shell"
             echo "  nix build .#server-image"
             echo "  kubectl kustomize deploy/overlays/gke-autopilot"
+            echo "  kubeconform -kubernetes-version 1.29.0 <(kubectl kustomize deploy/overlays/gke-autopilot)"
           '';
         };
       }

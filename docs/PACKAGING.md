@@ -41,6 +41,15 @@ CI runners should configure the same substituters in workflow `nix.conf`, not in
 
 `nix build .#server-image` on Darwin uses Nixpkgs `openssl` (no vendored `apple_sdk` stubs — those were removed upstream). If a future `nixpkgs` bump breaks `openssl-sys`, add the current [Darwin SDK frameworks](https://nixos.org/manual/nixpkgs/stable/#sec-darwin-legacy-frameworks) to `flake.nix` `buildInputs`.
 
+## Version bumps
+
+Keep these in sync when releasing:
+
+1. `Cargo.toml` `version`
+2. `flake.nix` (reads `Cargo.toml` via `cargoToml`)
+3. `dockworker.toml` `[tags].default` and per-image `tag`
+4. `deploy/overlays/gke-autopilot/kustomization.yaml` `images.newTag`
+
 ## dockworker.toml tags
 
 - `[tags].default` and per-image `tag` track the release semver (`0.2.0`).

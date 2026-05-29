@@ -4,10 +4,10 @@
 version = 1
 flake = ".#"
 
-# Tag strategy: default matches Cargo.toml / Kustomize image newTag.
+# Tag strategy: keep default/tag in sync with Cargo.toml package.version.
 # CI/release: export IMAGE_TAG="$(git rev-parse --short HEAD)" before push.
 [tags]
-default = "0.2.0"
+default = "0.2.0" # sync with Cargo.toml on release
 
 [[images]]
 name = "oxidizedgraph/server"

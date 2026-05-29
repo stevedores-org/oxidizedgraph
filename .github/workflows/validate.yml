@@ -1,4 +1,5 @@
 name: validate
+
 on:
   pull_request:
     paths:
@@ -7,6 +8,7 @@ on:
       - "flake.lock"
       - "Cargo.toml"
       - "Cargo.lock"
+      - "src/**"
       - "dockworker.toml"
       - ".github/workflows/validate.yml"
   push:
@@ -41,10 +43,10 @@ jobs:
         run: kustomize build deploy/overlays/gke-autopilot > /tmp/overlay.yaml
 
       - name: kubeconform — base
-        run: kubeconform -strict -summary -schema-location default -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{ .Group }}/{{ .ResourceKind | lower }}_{{ .ResourceAPIVersion }}.json' /tmp/base.yaml
+        run: kubeconform -strict -summary -kubernetes-version 1.29.0 /tmp/base.yaml
 
       - name: kubeconform — overlay
-        run: kubeconform -strict -summary -schema-location default -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{ .Group }}/{{ .ResourceKind | lower }}_{{ .ResourceAPIVersion }}.json' /tmp/overlay.yaml
+        run: kubeconform -strict -summary -kubernetes-version 1.29.0 /tmp/overlay.yaml
 
   nix:
     name: nix build .#server-image
@@ -56,5 +58,7 @@ jobs:
           nix_path: nixpkgs=channel:nixos-unstable
           extra_nix_config: |
             accept-flake-config = true
+            extra-substituters = https://nix-cache.stevedores.org
+            extra-trusted-public-keys = nix-cache.stevedores.org-1:Y2WLZtQTgxQ2QQzUnRDkDDKX08dL3NoNZ+Ohw3jv+7I=
       - name: build server-image
-        run: nix build .#server-image -L
+        run: nix build .#server-image -L --no-link
