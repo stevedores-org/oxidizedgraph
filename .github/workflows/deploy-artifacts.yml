@@ -1,0 +1,60 @@
+name: Deploy artifacts
+
+on:
+  pull_request:
+    paths:
+      - "deploy/**"
+      - "flake.nix"
+      - "flake.lock"
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - "src/**"
+      - "dockworker.toml"
+      - ".github/workflows/deploy-artifacts.yml"
+  push:
+    branches: [main]
+    paths:
+      - "deploy/**"
+      - "flake.nix"
+      - "flake.lock"
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - "src/**"
+      - "dockworker.toml"
+      - ".github/workflows/deploy-artifacts.yml"
+
+jobs:
+  kustomize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup kustomize
+        uses: imranismail/setup-kustomize@v2
+
+      - name: Build gke-autopilot overlay
+        run: kustomize build deploy/overlays/gke-autopilot > /dev/null
+
+      - name: Build base overlay
+        run: kustomize build deploy/base > /dev/null
+
+  nix-image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+
+      - name: Configure stevedores substituter (CI only)
+        run: |
+          mkdir -p ~/.config/nix
+          cat >> ~/.config/nix/nix.conf <<'EOF'
+          extra-substituters = https://nix-cache.stevedores.org
+          extra-trusted-public-keys = nix-cache.stevedores.org-1:Y2WLZtQTgxQ2QQzUnRDkDDKX08dL3NoNZ+Ohw3jv+7I=
+          EOF
+
+      - name: Build server OCI image
+        run: nix build .#server-image -L --no-link

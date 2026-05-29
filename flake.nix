@@ -1,74 +1,97 @@
 {
   description = "oxidizedgraph - LangGraph in Rust";
 
+  # Stevedores binary cache is opt-in (see docs/PACKAGING.md). nixConfig here is not
+  # applied unless the user is a trusted-user or passes --accept-flake-config.
+
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     rust-overlay.url = "github:oxalica/rust-overlay";
     flake-utils.url = "github:numtide/flake-utils";
+    crane.url = "github:ipetkov/crane";
   };
 
-  outputs = { self, nixpkgs, rust-overlay, flake-utils, ... }:
+  outputs = { self, nixpkgs, rust-overlay, flake-utils, crane, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         overlays = [ (import rust-overlay) ];
-        pkgs = import nixpkgs {
-          inherit system overlays;
-        };
+        pkgs = import nixpkgs { inherit system overlays; };
 
         rustToolchain = pkgs.rust-bin.stable.latest.default.override {
-          extensions = [ "rust-src" "rust-analyzer" ];
+          extensions = [ "rust-src" "rust-analyzer" "clippy" "rustfmt" ];
+        };
+
+        craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain;
+
+        commonArgs = {
+          src = craneLib.cleanCargoSource ./.;
+          strictDeps = true;
+          nativeBuildInputs = with pkgs; [ pkg-config cmake ];
+          # openssl-sys on Darwin: nixpkgs openssl is usually enough. If a future
+          # nixpkgs bump requires Apple frameworks, add them via the current
+          # apple-sdk / darwin SDK docs (legacy darwin.apple_sdk.* was removed).
+          buildInputs = with pkgs; [ openssl libgit2 ];
+        };
+
+        cargoArtifacts = craneLib.buildDepsOnly commonArgs;
+
+        oxidizedgraph-server = craneLib.buildPackage (commonArgs // {
+          inherit cargoArtifacts;
+          pname = "oxidizedgraph-server";
+          cargoExtraArgs = "--bin oxidizedgraph-server";
+        });
+
+        imageTag = "0.2.0";
+
+        server-image = pkgs.dockerTools.buildLayeredImage {
+          name = "oxidizedgraph/server";
+          tag = imageTag;
+          contents = [ oxidizedgraph-server pkgs.cacert ];
+          config = {
+            Cmd = [ "${oxidizedgraph-server}/bin/oxidizedgraph-server" ];
+            ExposedPorts = { "8080/tcp" = {}; };
+            Env = [ "PORT=8080" "RUST_LOG=info" ];
+          };
         };
       in
       {
-        devShells.default = pkgs.mkShell {
-          buildInputs = with pkgs; [
-            # Rust toolchain
-            rustToolchain
-            cargo-watch
-            cargo-edit
-            cargo-expand
-
-            # SurrealDB
-            surrealdb
-
-            # Build dependencies
-            pkg-config
-            openssl
-
-            # Development tools
-            just
-            git
-          ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
-            pkgs.darwin.apple_sdk.frameworks.Security
-            pkgs.darwin.apple_sdk.frameworks.SystemConfiguration
-          ];
-
-          shellHook = ''
-            echo "oxidizedgraph dev environment"
-            echo "  rust: $(rustc --version)"
-            echo "  surreal: $(surreal version 2>/dev/null || echo 'not in path')"
-            echo ""
-            echo "Commands:"
-            echo "  cargo build    - build the library"
-            echo "  cargo test     - run tests"
-            echo "  surreal start  - start SurrealDB (memory mode: surreal start memory)"
-          '';
-
-          RUST_BACKTRACE = 1;
+        packages = {
+          default = oxidizedgraph-server;
+          inherit oxidizedgraph-server server-image;
         };
 
-        packages.default = pkgs.rustPlatform.buildRustPackage {
-          pname = "oxidizedgraph";
-          version = "0.1.1";
-          src = ./.;
-          cargoLock.lockFile = ./Cargo.lock;
+        checks = {
+          inherit oxidizedgraph-server;
+          clippy = craneLib.cargoClippy (commonArgs // {
+            inherit cargoArtifacts;
+            cargoClippyExtraArgs = "--all-targets -- -D warnings";
+          });
+          fmt = craneLib.cargoFmt { src = craneLib.cleanCargoSource ./.; };
+          tests = craneLib.cargoNextest (commonArgs // {
+            inherit cargoArtifacts;
+            partitions = 1;
+            partitionType = "count";
+          });
+        };
 
-          nativeBuildInputs = with pkgs; [ pkg-config ];
-          buildInputs = with pkgs; [ openssl ]
-            ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
-              pkgs.darwin.apple_sdk.frameworks.Security
-              pkgs.darwin.apple_sdk.frameworks.SystemConfiguration
-            ];
+        devShells.default = craneLib.devShell {
+          checks = self.checks.${system};
+          packages = with pkgs; [
+            rustToolchain
+            cargo-watch
+            surrealdb
+            skopeo
+            kubectl
+            kustomize
+            just
+            git
+          ];
+          RUST_BACKTRACE = "1";
+          shellHook = ''
+            echo "oxidizedgraph dev shell"
+            echo "  nix build .#server-image"
+            echo "  kubectl kustomize deploy/overlays/gke-autopilot"
+          '';
         };
       }
     );
