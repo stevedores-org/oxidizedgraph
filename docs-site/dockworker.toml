@@ -1,0 +1,128 @@
+# dockworker.toml - OCI Standard Configuration for oxidizedgraph docs
+# No Dockerfile required - dockworker.ai builds OCI-compliant images
+
+[package]
+name = "oxidizedgraph-docs"
+version = "0.1.0"
+description = "Documentation site for oxidizedgraph"
+authors = ["stevedores-org"]
+runtime = "bun"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# OCI Image Configuration
+# ═══════════════════════════════════════════════════════════════════════════════
+[oci]
+spec = "1.0"
+builder = "nix"
+base = "cgr.dev/chainguard/nginx:1.27"
+
+[oci.image]
+url = "https://github.com/stevedores-org/oxidizedgraph"
+source = "https://github.com/stevedores-org/oxidizedgraph"
+vendor = "stevedores"
+licenses = "MIT"
+title = "oxidizedgraph-docs"
+
+[oci.image.labels]
+"stevedores.org/component" = "oxidizedgraph-docs"
+"stevedores.org/managed-by" = "dockworker"
+"stevedores.org/runtime" = "bun"
+"org.opencontainers.image.source" = "https://github.com/stevedores-org/oxidizedgraph"
+"org.opencontainers.image.description" = "Documentation site for oxidizedgraph"
+
+[oci.config]
+user = "nonroot:nonroot"
+workdir = "/usr/share/nginx/html"
+entrypoint = ["/usr/sbin/nginx"]
+cmd = ["-g", "daemon off;"]
+expose = ["8080/tcp"]
+stop_signal = "SIGTERM"
+
+[oci.config.env]
+PORT = "8080"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Build Configuration (Bun + Vite)
+# ═══════════════════════════════════════════════════════════════════════════════
+[build]
+runtime = "bun"
+install = "bun install --frozen-lockfile"
+build = "bun run build"
+typecheck = "bunx tsc --noEmit"
+
+[build.output]
+include = ["dist/**"]
+exclude = [
+  "node_modules",
+  "src",
+  "*.md",
+  ".git",
+  ".env*",
+]
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Layer Configuration (OCI layers)
+# ═══════════════════════════════════════════════════════════════════════════════
+[[oci.layers]]
+name = "nginx-config"
+source = "nginx.conf"
+paths = ["/etc/nginx/conf.d/default.conf"]
+cache = true
+
+[[oci.layers]]
+name = "static-assets"
+paths = ["/usr/share/nginx/html"]
+cache = false
+invalidate_on = ["package.json", "bun.lock"]
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Health Check
+# ═══════════════════════════════════════════════════════════════════════════════
+[oci.healthcheck]
+test = ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/oxidizedgraph/"]
+interval = "30s"
+timeout = "5s"
+start_period = "10s"
+retries = 3
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Multi-Architecture Support
+# ═══════════════════════════════════════════════════════════════════════════════
+[oci.platforms]
+architectures = ["amd64", "arm64"]
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Security Configuration
+# ═══════════════════════════════════════════════════════════════════════════════
+[oci.security]
+user = 65532
+group = 65532
+read_only_rootfs = true
+no_new_privileges = true
+drop_capabilities = ["ALL"]
+add_capabilities = []
+seccomp_profile = "runtime/default"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SBOM & Signing
+# ═══════════════════════════════════════════════════════════════════════════════
+[oci.sbom]
+enabled = true
+format = "spdx-json"
+attach = true
+
+[oci.signing]
+enabled = true
+provider = "sigstore"
+keyless = true
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Security Scanning
+# ═══════════════════════════════════════════════════════════════════════════════
+[security]
+sbom = true
+provenance = true
+
+[security.scan]
+trivy = true
+fail_on = "HIGH,CRITICAL"
