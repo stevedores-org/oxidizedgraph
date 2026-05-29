@@ -3,16 +3,14 @@ kind: Kustomization
 
 resources:
   - ../../base
+  - networkpolicy.yaml
+  - poddisruptionbudget.yaml
 
-# GKE Autopilot: explicit resources, Workload Identity on ServiceAccount.
+# Pin by semver in-repo; override with digest at deploy time (see docs/DEPLOY_GKE.md).
+images:
+  - name: ghcr.io/stevedores-org/oxidizedgraph/server
+    newTag: "0.2.0"
+
 patches:
-  - target:
-      kind: Deployment
-      name: oxidizedgraph
-    patch: |-
-      - op: replace
-        path: /spec/template/spec/containers/0/resources/requests/cpu
-        value: "250m"
-      - op: replace
-        path: /spec/template/spec/containers/0/resources/requests/memory
-        value: "512Mi"
+  - path: deployment-autopilot.yaml
+  - path: serviceaccount-wi.yaml

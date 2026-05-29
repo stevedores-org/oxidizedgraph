@@ -5,28 +5,40 @@ Package and run **oxidizedgraph-server** on Kubernetes using **Nix OCI images** 
 ## Build & push
 
 ```bash
-nix develop   # optional: skopeo, just
+nix develop   # skopeo, kubectl, kustomize, just
 
-nix build .#server-image -L
-docker load -i result
-docker image ls oxidizedgraph/server
-
-# Or
 just image
 just push
-# dockworker build   # all images in dockworker.toml
+# Prod: IMAGE_TAG="$(git rev-parse --short HEAD)" just push
 ```
 
-Image: `ghcr.io/stevedores-org/oxidizedgraph/server:latest`
+Default image: `ghcr.io/stevedores-org/oxidizedgraph/server:0.2.0` (semver, not `:latest`).
+
+See [PACKAGING.md](PACKAGING.md) for the Stevedores Nix cache (opt-in) and tag strategy.
 
 ## Deploy (GKE Autopilot)
 
+The **gke-autopilot** overlay is opinionated:
+
+- **2 replicas** + **PodDisruptionBudget** (`minAvailable: 1`)
+- **Guaranteed QoS** (`limits` = `requests`: 250m CPU, 512Mi memory)
+- **`imagePullPolicy: Always`**
+- **NetworkPolicy** default-deny ingress/egress with allowances for oxidizedgraph HTTP/DNS/HTTPS
+- **Workload Identity** patch in overlay only (`deploy/overlays/gke-autopilot/serviceaccount-wi.yaml`)
+
 ```bash
-# Edit deploy/base/serviceaccount.yaml — Workload Identity GCP SA email
+# Edit overlay WI placeholder (do not patch base/):
+#   deploy/overlays/gke-autopilot/serviceaccount-wi.yaml
+
+# Optional: pin digest at deploy time
+cd deploy/overlays/gke-autopilot
+kustomize edit set image ghcr.io/stevedores-org/oxidizedgraph/server=ghcr.io/stevedores-org/oxidizedgraph/server@sha256:...
 
 kubectl apply -k deploy/overlays/gke-autopilot
-kubectl -n oxidizedgraph get pods,svc
+kubectl -n oxidizedgraph get pods,svc,pdb,networkpolicy
 ```
+
+Local/minimal deploy without Autopilot hardening: `kubectl apply -k deploy/base`.
 
 ## API
 
@@ -59,6 +71,6 @@ When emitting graph events to [data-fabric](https://github.com/stevedores-org/da
 
 ## Autopilot constraints
 
-- Resource requests/limits are required (set in `deployment.yaml`).
+- Resource requests/limits are required; the overlay sets Guaranteed QoS.
 - No privileged pods or hostPath volumes.
-- Use Workload Identity for pulling from private registries on GCR/GAR if needed.
+- NetworkPolicy may need extra ingress rules if callers live in other namespaces (edit `networkpolicy.yaml`).

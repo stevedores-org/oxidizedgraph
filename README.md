@@ -187,7 +187,7 @@ just image          # nix build .#server-image
 just deploy-gke     # kubectl apply -k deploy/overlays/gke-autopilot
 ```
 
-See [docs/DEPLOY_GKE.md](docs/DEPLOY_GKE.md). The root `Dockerfile` is legacy; prefer the Nix path above.
+See [docs/DEPLOY_GKE.md](docs/DEPLOY_GKE.md) and [docs/PACKAGING.md](docs/PACKAGING.md). The root `Dockerfile` is legacy; prefer the Nix path above.
 
 ## Contributing
 

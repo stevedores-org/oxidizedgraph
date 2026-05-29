@@ -1,13 +1,19 @@
 # OCI packaging: nix builds image tarballs -> skopeo pushes to registry.
-# See docs/DEPLOY_GKE.md
+# See docs/PACKAGING.md and docs/DEPLOY_GKE.md
 
 version = 1
 flake = ".#"
+
+# Tag strategy: default matches Cargo.toml / Kustomize image newTag.
+# CI/release: export IMAGE_TAG="$(git rev-parse --short HEAD)" before push.
+[tags]
+default = "0.2.0"
 
 [[images]]
 name = "oxidizedgraph/server"
 nix_output = "server-image"
 push = true
+tag = "0.2.0"
 
 [registry]
 default = "ghcr.io/stevedores-org"

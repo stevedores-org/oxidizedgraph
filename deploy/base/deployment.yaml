@@ -2,7 +2,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: oxidizedgraph
-  namespace: oxidizedgraph
   labels:
     app.kubernetes.io/name: oxidizedgraph
     stevedores.org/managed-by: kustomize
@@ -23,8 +22,7 @@ spec:
         fsGroup: 1000
       containers:
         - name: oxidizedgraph
-          image: ghcr.io/stevedores-org/oxidizedgraph/server:latest
-          imagePullPolicy: IfNotPresent
+          image: ghcr.io/stevedores-org/oxidizedgraph/server:0.2.0
           ports:
             - name: http
               containerPort: 8080
@@ -33,11 +31,11 @@ spec:
                 name: oxidizedgraph
           resources:
             requests:
-              cpu: "250m"
-              memory: "512Mi"
+              cpu: "100m"
+              memory: "256Mi"
             limits:
-              cpu: "2"
-              memory: "2Gi"
+              cpu: "1"
+              memory: "1Gi"
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:

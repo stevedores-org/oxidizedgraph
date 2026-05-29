@@ -1,12 +1,8 @@
 {
   description = "oxidizedgraph - LangGraph in Rust";
 
-  nixConfig = {
-    extra-substituters = [ "https://nix-cache.stevedores.org" ];
-    extra-trusted-public-keys = [
-      "nix-cache.stevedores.org-1:Y2WLZtQTgxQ2QQzUnRDkDDKX08dL3NoNZ+Ohw3jv+7I="
-    ];
-  };
+  # Stevedores binary cache is opt-in (see docs/PACKAGING.md). nixConfig here is not
+  # applied unless the user is a trusted-user or passes --accept-flake-config.
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -31,6 +27,9 @@
           src = craneLib.cleanCargoSource ./.;
           strictDeps = true;
           nativeBuildInputs = with pkgs; [ pkg-config cmake ];
+          # openssl-sys on Darwin: nixpkgs openssl is usually enough. If a future
+          # nixpkgs bump requires Apple frameworks, add them via the current
+          # apple-sdk / darwin SDK docs (legacy darwin.apple_sdk.* was removed).
           buildInputs = with pkgs; [ openssl libgit2 ];
         };
 
@@ -42,9 +41,11 @@
           cargoExtraArgs = "--bin oxidizedgraph-server";
         });
 
+        imageTag = "0.2.0";
+
         server-image = pkgs.dockerTools.buildLayeredImage {
           name = "oxidizedgraph/server";
-          tag = "latest";
+          tag = imageTag;
           contents = [ oxidizedgraph-server pkgs.cacert ];
           config = {
             Cmd = [ "${oxidizedgraph-server}/bin/oxidizedgraph-server" ];
@@ -80,6 +81,8 @@
             cargo-watch
             surrealdb
             skopeo
+            kubectl
+            kustomize
             just
             git
           ];
@@ -87,7 +90,7 @@
           shellHook = ''
             echo "oxidizedgraph dev shell"
             echo "  nix build .#server-image"
-            echo "  kubectl apply -k deploy/overlays/gke-autopilot"
+            echo "  kubectl kustomize deploy/overlays/gke-autopilot"
           '';
         };
       }

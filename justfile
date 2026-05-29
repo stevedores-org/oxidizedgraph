@@ -3,6 +3,9 @@
 default:
     @just --list
 
+image-tag := env_var_or_default("IMAGE_TAG", "0.2.0")
+image := "ghcr.io/stevedores-org/oxidizedgraph/server:" + image-tag
+
 build:
     cargo build --bin oxidizedgraph-server
 
@@ -16,12 +19,14 @@ run:
 image:
     nix build .#server-image -L
 
-push:
-    skopeo copy docker-archive:./result \
-      docker://ghcr.io/stevedores-org/oxidizedgraph/server:latest
+push: image
+    skopeo copy docker-archive:./result "docker://{{image}}"
 
 images:
     dockworker build
+
+kustomize-check:
+    kubectl kustomize deploy/overlays/gke-autopilot > /dev/null
 
 deploy-gke:
     kubectl apply -k deploy/overlays/gke-autopilot
