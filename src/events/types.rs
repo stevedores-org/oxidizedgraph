@@ -2,7 +2,22 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 use std::time::Duration;
+
+/// Metadata for tasks that are part of an agent evaluation.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct EvaluationMetadata {
+    /// Associated AIVCS run ID for recording events.
+    pub aivcs_run_id: Option<String>,
+    /// Path to the success rubric for this evaluation.
+    pub rubric_path: Option<PathBuf>,
+    /// Whether this task is a production-promotion gate.
+    pub is_promotion_gate: bool,
+    /// Current maturity phase of the agent (1-4).
+    pub agent_phase: u8,
+}
 
 /// A graph execution event
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -16,6 +31,10 @@ pub struct Event {
     /// Thread/conversation ID this event belongs to
     pub thread_id: String,
 
+    /// Evaluation context for this run
+    #[serde(default)]
+    pub evaluation: EvaluationMetadata,
+
     /// The specific event data
     pub kind: EventKind,
 }
@@ -27,6 +46,22 @@ impl Event {
             id: uuid::Uuid::new_v4().to_string(),
             timestamp: Utc::now(),
             thread_id: thread_id.into(),
+            evaluation: EvaluationMetadata::default(),
+            kind,
+        }
+    }
+
+    /// Create a new event with evaluation metadata
+    pub fn with_evaluation(
+        thread_id: impl Into<String>,
+        kind: EventKind,
+        evaluation: EvaluationMetadata,
+    ) -> Self {
+        Self {
+            id: uuid::Uuid::new_v4().to_string(),
+            timestamp: Utc::now(),
+            thread_id: thread_id.into(),
+            evaluation,
             kind,
         }
     }

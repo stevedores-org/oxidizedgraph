@@ -1,0 +1,9 @@
+# oxidizedgraph — Cursor IDE Rules
+
+- **Rust Language**: Generate idiomatic Rust 2021. Favor async/await and Tokio.
+- **Workflow State**: When generating node logic, ensure state access is wrapped in proper `RwLock` guards.
+- **Node Implementation**: Always include `NodeExecutor` trait implementation for new nodes.
+- **Testing**: Every new feature or node must include a unit test in a `#[cfg(test)]` block.
+- **AIVCS**: Ensure new `Runtime` features consider event recording for the AIVCS ledger.
+- **Context**: Load `CLAUDE.md` and `GEMINI.md` for architectural context.
+- **Clippy**: All code must be warning-free.
