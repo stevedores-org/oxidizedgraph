@@ -92,7 +92,8 @@ jobs:
   publish-ecr:
     name: publish linux/amd64 image to ECR
     needs: nix
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && secrets.AWS_ACCESS_KEY_ID != ''
+    # Secrets cannot be referenced in job-level if; use repo variable ECR_PUBLISH=true.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.ECR_PUBLISH == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
