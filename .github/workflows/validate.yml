@@ -92,8 +92,8 @@ jobs:
   publish-ecr:
     name: publish linux/amd64 image to ECR
     needs: nix
-    # Secrets cannot be referenced in job-level if; use repo variable ECR_PUBLISH=true.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.ECR_PUBLISH == 'true'
+    # GitHub OIDC → IAM role (no long-lived AWS keys). Set repo var AWS_OIDC_ROLE_ARN.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.AWS_OIDC_ROLE_ARN != ''
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -101,12 +101,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Configure AWS credentials
+      - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ vars.AWS_OIDC_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
+          role-session-name: oxidizedgraph-publish-ecr-${{ github.run_id }}
 
       - uses: cachix/install-nix-action@v27
         with:
