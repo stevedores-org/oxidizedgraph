@@ -52,6 +52,10 @@ Long-lived `AWS_ACCESS_KEY_ID` in GitHub is **not** used. `publish-ecr` assumes 
 |---------------|---------|
 | `AWS_OIDC_ROLE_ARN` | IAM role trusted by `token.actions.githubusercontent.com` for this repo |
 
+**Trust-policy contract.** The IAM role specified by `AWS_OIDC_ROLE_ARN` must trust the GitHub OIDC provider for **audience** `sts.amazonaws.com` and **subject** matching `repo:stevedores-org/oxidizedgraph:*` (or scoped to a specific ref, e.g. `repo:stevedores-org/oxidizedgraph:ref:refs/heads/main`). The workflow declares the audience explicitly so a trust-policy reshuffle has the matching value at hand.
+
+A missing `AWS_OIDC_ROLE_ARN` is a loud CI failure (the `publish-ecr-preflight` job exits non-zero on every push to `main`), not a silent skip.
+
 Workflow env: `ECR_REGISTRY=148080843892.dkr.ecr.us-east-2.amazonaws.com`, `ECR_REPOSITORY=stevedores-org/oxidizedgraph/server`.
 
 Tags on merge to `main`: `{Cargo version}`, `{version}-{git_sha}`, `latest`.

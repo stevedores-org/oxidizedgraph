@@ -89,10 +89,30 @@ jobs:
       - name: build server-image
         run: nix build .#server-image -L --no-link
 
+  publish-ecr-preflight:
+    name: publish-ecr preflight
+    # Runs unconditionally on push-to-main so a missing repo variable is a
+    # loud CI failure, not a silent skip of `publish-ecr`. The actual
+    # publish job's `if:` gate stays in place to short-circuit feature PRs.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify AWS_OIDC_ROLE_ARN is set
+        env:
+          ROLE_ARN: ${{ vars.AWS_OIDC_ROLE_ARN }}
+        run: |
+          if [[ -z "$ROLE_ARN" ]]; then
+            echo "::error::AWS_OIDC_ROLE_ARN repo variable is empty. publish-ecr will be silently skipped. Configure the variable to enable publishing — see docs/DEPLOY_GKE.md."
+            exit 1
+          fi
+          echo "✓ AWS_OIDC_ROLE_ARN is set; publish-ecr will run."
+
   publish-ecr:
     name: publish linux/amd64 image to ECR
-    needs: nix
-    # GitHub OIDC → IAM role (no long-lived AWS keys). Set repo var AWS_OIDC_ROLE_ARN.
+    needs: [nix, publish-ecr-preflight]
+    # Use vars (not secrets) — secrets can't be referenced in job-level `if`.
+    # The preflight job above turns a missing variable into a visible failure;
+    # this gate still short-circuits non-main pushes and PR runs.
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.AWS_OIDC_ROLE_ARN != ''
     runs-on: ubuntu-latest
     permissions:
@@ -102,11 +122,18 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4
+        # SHA-pinned per security policy — floating @v4 lets a compromised
+        # release of this action mint AWS credentials on our behalf. Bump
+        # via Dependabot; comment carries the human-readable version.
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
         with:
           role-to-assume: ${{ vars.AWS_OIDC_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
-          role-session-name: oxidizedgraph-publish-ecr-${{ github.run_id }}
+          # Explicit audience so a future trust-policy reshuffle has the
+          # matching value at hand. `sts.amazonaws.com` is the action's
+          # default; declaring it makes the contract visible.
+          audience: sts.amazonaws.com
+          role-session-name: oxidizedgraph-publish-ecr-${{ github.run_id }}-${{ github.run_attempt }}
 
       - uses: cachix/install-nix-action@v27
         with:
@@ -131,7 +158,16 @@ jobs:
         run: |
           mkdir -p ~/.config/containers
           printf '%s\n' '{"default":[{"type":"insecureAcceptAnything"}]}' > ~/.config/containers/policy.json
-          VERSION=$(grep '^version' Cargo.toml | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+          # Parse the published-package version from cargo metadata so we're
+          # immune to: workspace.package.version moves, `# version = ...`
+          # comment lines, and dep entries that sort before the [package]
+          # block via `head -1`. `jq` ships on ubuntu-latest.
+          VERSION=$(cargo metadata --no-deps --format-version 1 \
+            | jq -r '.packages[] | select(.name=="oxidizedgraph") | .version')
+          if [[ -z "$VERSION" ]]; then
+            echo "::error::Failed to parse package version from cargo metadata"
+            exit 1
+          fi
           IMAGE="${ECR_REGISTRY}/${ECR_REPOSITORY}"
           TAG_SHA="${VERSION}-${GITHUB_SHA::7}"
           aws ecr get-login-password --region "$AWS_REGION" \
