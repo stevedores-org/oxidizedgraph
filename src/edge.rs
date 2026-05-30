@@ -1,8 +1,9 @@
-//! Edge definitions for oxidizedgraph
+//! Legacy edge definitions for oxidizedgraph
 //!
-//! Edges define the transitions between nodes in a graph.
-//! They can be direct (always go to a specific node) or
-//! conditional (choose based on state).
+//! **Deprecated:** This module contains an unused generic implementation.
+//! Use [`EdgeType`](crate::graph::EdgeType) and [`GraphEdge`](crate::graph::GraphEdge) from the `graph` module instead.
+//!
+//! This module will be removed in v0.3.0.
 
 use crate::state::State;
 use std::sync::Arc;
@@ -36,29 +37,11 @@ impl EdgeTarget {
     }
 }
 
+#[deprecated(
+    since = "0.2.0",
+    note = "Use conditional edges in `GraphBuilder` instead. Will be removed in 0.3.0."
+)]
 /// Conditional routing trait
-///
-/// Implement this trait to create custom routing logic based on state.
-///
-/// # Example
-///
-/// ```rust,ignore
-/// struct ShouldContinue;
-///
-/// impl Router<MyState> for ShouldContinue {
-///     fn route(&self, state: &MyState) -> EdgeTarget {
-///         if state.is_complete {
-///             EdgeTarget::End
-///         } else {
-///             EdgeTarget::node("process")
-///         }
-///     }
-///
-///     fn possible_targets(&self) -> Vec<EdgeTarget> {
-///         vec![EdgeTarget::node("process"), EdgeTarget::End]
-///     }
-/// }
-/// ```
 pub trait Router<S: State>: Send + Sync {
     /// Determine the next edge target based on current state
     fn route(&self, state: &S) -> EdgeTarget;
@@ -116,6 +99,10 @@ where
     }
 }
 
+#[deprecated(
+    since = "0.2.0",
+    note = "Use `EdgeType` and `GraphEdge` from the `graph` module instead. Will be removed in 0.3.0."
+)]
 /// Edge definition in the graph
 pub enum Edge<S: State> {
     /// Always go to target

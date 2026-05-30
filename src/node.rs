@@ -1,9 +1,9 @@
-//! Node definitions for oxidizedgraph
+//! Legacy node definitions for oxidizedgraph
 //!
-//! Nodes are the building blocks of your workflow. Each node:
-//! - Receives the current state
-//! - Performs some action (LLM call, tool execution, etc.)
-//! - Returns an updated state with routing decision
+//! **Deprecated:** This module contains an unused generic implementation.
+//! Use [`NodeExecutor`](crate::graph::NodeExecutor) from the `graph` module instead.
+//!
+//! This module will be removed in v0.3.0.
 
 use crate::error::NodeError;
 use crate::state::State;
@@ -12,6 +12,10 @@ use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
 
+#[deprecated(
+    since = "0.2.0",
+    note = "Use `NodeOutput` from the `graph` module instead. Will be removed in 0.3.0."
+)]
 /// Result of node execution
 #[derive(Clone, Debug)]
 pub enum NodeResult<S: State> {
@@ -149,6 +153,10 @@ pub enum RetryOn {
     None,
 }
 
+#[deprecated(
+    since = "0.2.0",
+    note = "Use `NodeExecutor` from the `graph` module instead. Will be removed in 0.3.0."
+)]
 /// A node in the graph workflow.
 ///
 /// Nodes are the fundamental execution units. Each node:
@@ -180,22 +188,21 @@ pub trait Node<S: State>: Send + Sync {
     }
 }
 
+#[deprecated(
+    since = "0.2.0",
+    note = "Use `BoxedNodeExecutor` from the `graph` module instead. Will be removed in 0.3.0."
+)]
 /// A boxed node for type erasure
 pub type BoxedNode<S> = Box<dyn Node<S>>;
 
+#[deprecated(
+    since = "0.2.0",
+    note = "Use `FunctionNode` from the `nodes` module instead. Will be removed in 0.3.0."
+)]
 /// A node implemented as a closure.
 ///
 /// This provides a more ergonomic way to define simple nodes
 /// without creating a new struct.
-///
-/// # Example
-///
-/// ```rust,ignore
-/// let node = FnNode::new("increment", |mut state: MyState| async move {
-///     state.counter += 1;
-///     Ok(NodeResult::Continue(state))
-/// });
-/// ```
 pub struct FnNode<S, F, Fut>
 where
     S: State,
@@ -252,7 +259,7 @@ impl<S, F, Fut> Node<S> for FnNode<S, F, Fut>
 where
     S: State,
     F: Fn(S) -> Fut + Send + Sync,
-    Fut: Future<Output = Result<NodeResult<S>, NodeError>> + Send,
+    Fut: Future<Output = Result<NodeResult<S>, NodeError>> + Send + Sync,
 {
     fn id(&self) -> &str {
         &self.id
@@ -275,6 +282,10 @@ where
     }
 }
 
+#[deprecated(
+    since = "0.2.0",
+    note = "This type is unused and will be removed in 0.3.0."
+)]
 /// A node that wraps another node with middleware-like behavior.
 pub struct WrappedNode<S: State, Inner: Node<S>> {
     inner: Inner,

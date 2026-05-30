@@ -206,10 +206,8 @@ impl<P: LLMProvider + 'static> NodeExecutor for LLMNode<P> {
             // Add assistant message
             guard.add_assistant_message(&response.content);
 
-            // Store tool calls if any
-            if !response.tool_calls.is_empty() {
-                guard.tool_calls = response.tool_calls;
-            }
+            // Store tool calls
+            guard.tool_calls = response.tool_calls;
 
             // Mark complete if no tool calls
             if guard.tool_calls.is_empty() {
@@ -320,5 +318,28 @@ mod tests {
         let guard = shared.read().unwrap();
         assert_eq!(guard.messages.len(), 2); // user + assistant
         assert!(guard.is_complete); // No tool calls, so marked complete
+    }
+
+    #[tokio::test]
+    async fn test_llm_node_clears_stale_tool_calls() {
+        struct NoToolProvider;
+        #[async_trait]
+        impl LLMProvider for NoToolProvider {
+            async fn generate(&self, _m: &[Message], _c: &LLMConfig) -> Result<LLMResponse, NodeError> {
+                Ok(LLMResponse::text("No tools here"))
+            }
+            fn name(&self) -> &str { "mock" }
+        }
+
+        let node = LLMNode::with_provider("llm", NoToolProvider);
+        let mut state = AgentState::new();
+        state.tool_calls.push(ToolCall::new("old", "old_tool", serde_json::json!({})));
+        let shared = Arc::new(RwLock::new(state));
+
+        let _ = node.execute(shared.clone()).await.unwrap();
+
+        let guard = shared.read().unwrap();
+        assert!(guard.tool_calls.is_empty());
+        assert!(guard.is_complete);
     }
 }

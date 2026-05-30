@@ -1,6 +1,7 @@
 //! Parallel subgraph execution
 
 use async_trait::async_trait;
+use futures::stream::{FuturesUnordered, StreamExt};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{debug, info, warn};
@@ -169,7 +170,8 @@ impl ParallelSubgraphs {
 
     /// Execute all subgraphs and return results
     async fn execute_all(&self, parent_state: &AgentState) -> Vec<(String, SubgraphResult)> {
-        let mut handles = Vec::with_capacity(self.subgraphs.len());
+        let mut futures = FuturesUnordered::new();
+        let mut abort_handles = Vec::with_capacity(self.subgraphs.len());
 
         // Spawn all subgraphs
         for subgraph_config in &self.subgraphs {
@@ -192,129 +194,81 @@ impl ParallelSubgraphs {
                 }
             });
 
-            handles.push((subgraph_config.id.clone(), handle));
+            let id_clone = subgraph_config.id.clone();
+            abort_handles.push(handle.abort_handle());
+            futures.push(async move {
+                let res = match handle.await {
+                    Ok(res) => res,
+                    Err(e) => {
+                        if e.is_cancelled() {
+                            SubgraphResult::Cancelled {
+                                subgraph_id: id_clone.clone(),
+                            }
+                        } else {
+                            SubgraphResult::Failed {
+                                subgraph_id: id_clone.clone(),
+                                error: crate::error::RuntimeError::InvalidState(format!(
+                                    "Task panicked: {}",
+                                    e
+                                )),
+                            }
+                        }
+                    }
+                };
+                (id_clone, res)
+            });
         }
+
+        if abort_handles.is_empty() {
+            return Vec::new();
+        }
+
+        let mut results = Vec::with_capacity(abort_handles.len());
 
         // Collect results based on join strategy
         match &self.join_strategy {
             JoinStrategy::WaitAll => {
-                let mut results = Vec::with_capacity(handles.len());
-                for (id, handle) in handles {
-                    let result = handle.await.unwrap_or_else(|e| SubgraphResult::Failed {
-                        subgraph_id: id.clone(),
-                        error: crate::error::RuntimeError::InvalidState(format!(
-                            "Task panicked: {}",
-                            e
-                        )),
-                    });
-                    results.push((id, result));
+                while let Some(result) = futures.next().await {
+                    results.push(result);
                 }
-                results
             }
             JoinStrategy::WaitFirst => {
-                if handles.is_empty() {
-                    return Vec::new();
+                if let Some(result) = futures.next().await {
+                    results.push(result);
                 }
-
-                // Race all handles using boxed futures for Unpin
-                let futures: Vec<_> = handles
-                    .into_iter()
-                    .map(|(id, h)| {
-                        let id_clone = id.clone();
-                        Box::pin(async move {
-                            let result = h.await.unwrap_or_else(|e| SubgraphResult::Failed {
-                                subgraph_id: id_clone.clone(),
-                                error: crate::error::RuntimeError::InvalidState(format!(
-                                    "Task panicked: {}",
-                                    e
-                                )),
-                            });
-                            (id_clone, result)
-                        })
-                    })
-                    .collect();
-
-                let (result, _, _) = futures::future::select_all(futures).await;
-                vec![result]
+                for handle in abort_handles {
+                    handle.abort();
+                }
             }
             JoinStrategy::FailFast => {
-                if handles.is_empty() {
-                    return Vec::new();
-                }
-
-                let mut futures: Vec<_> = handles
-                    .into_iter()
-                    .map(|(id, h)| {
-                        let id_clone = id.clone();
-                        Box::pin(async move {
-                            let result = h.await.unwrap_or_else(|e| SubgraphResult::Failed {
-                                subgraph_id: id_clone.clone(),
-                                error: crate::error::RuntimeError::InvalidState(format!(
-                                    "Task panicked: {}",
-                                    e
-                                )),
-                            });
-                            (id_clone, result)
-                        })
-                    })
-                    .collect();
-
-                let mut results = Vec::new();
-
-                while !futures.is_empty() {
-                    let ((id, result), _, remaining) = futures::future::select_all(futures).await;
-                    futures = remaining;
-
+                while let Some((id, result)) = futures.next().await {
                     let is_failed = result.is_failed();
                     results.push((id, result));
-
                     if is_failed {
+                        for handle in abort_handles {
+                            handle.abort();
+                        }
                         return results;
                     }
                 }
-                results
             }
             JoinStrategy::WaitN(n) => {
-                if handles.is_empty() {
-                    return Vec::new();
-                }
-
-                let mut futures: Vec<_> = handles
-                    .into_iter()
-                    .map(|(id, h)| {
-                        let id_clone = id.clone();
-                        Box::pin(async move {
-                            let result = h.await.unwrap_or_else(|e| SubgraphResult::Failed {
-                                subgraph_id: id_clone.clone(),
-                                error: crate::error::RuntimeError::InvalidState(format!(
-                                    "Task panicked: {}",
-                                    e
-                                )),
-                            });
-                            (id_clone, result)
-                        })
-                    })
-                    .collect();
-
-                let mut results = Vec::new();
-                let mut completed_count = 0;
-
-                while !futures.is_empty() {
-                    let ((id, result), _, remaining) = futures::future::select_all(futures).await;
-                    futures = remaining;
-
+                let mut completed = 0;
+                while let Some((id, result)) = futures.next().await {
                     if result.is_completed() {
-                        completed_count += 1;
+                        completed += 1;
                     }
                     results.push((id, result));
-
-                    if completed_count >= *n {
+                    if completed >= *n {
+                        for handle in abort_handles {
+                            handle.abort();
+                        }
                         return results;
                     }
                 }
-                results
             }
         }
+        results
     }
 }
 
@@ -396,7 +350,7 @@ mod tests {
     use super::*;
     use crate::graph::GraphBuilder;
     use std::sync::RwLock;
-    use std::time::Duration;
+    use std::time::{Duration, Instant};
 
     struct DelayedSetNode {
         id: String,
@@ -462,5 +416,43 @@ mod tests {
         let result = parallel.execute(state).await.unwrap();
 
         assert!(result.is_terminal());
+    }
+
+    #[tokio::test]
+    async fn test_parallel_fail_fast() {
+        let parallel = ParallelSubgraphs::new("parallel")
+            .add_subgraph("slow", create_delayed_graph("slow", "s", "v", 1000))
+            .add_subgraph("fast_fail", GraphBuilder::new()
+                .add_node(crate::nodes::function::FunctionNode::new("fail", |_| async {
+                    Err(NodeError::execution_failed("intentional failure"))
+                }))
+                .set_entry_point("fail")
+                .compile()
+                .unwrap())
+            .with_join_strategy(JoinStrategy::FailFast);
+
+        let state = Arc::new(RwLock::new(AgentState::new()));
+        let start = Instant::now();
+        let _ = parallel.execute(state).await.unwrap();
+        let elapsed = start.elapsed();
+
+        // Should return quickly due to fail-fast, not wait for the 1000ms subgraph
+        assert!(elapsed < Duration::from_millis(900));
+    }
+
+    #[tokio::test]
+    async fn test_parallel_wait_first() {
+        let parallel = ParallelSubgraphs::new("parallel")
+            .add_subgraph("fast", create_delayed_graph("fast", "f", "v", 10))
+            .add_subgraph("slow", create_delayed_graph("slow", "s", "v", 1000))
+            .with_join_strategy(JoinStrategy::WaitFirst);
+
+        let state = Arc::new(RwLock::new(AgentState::new()));
+        let start = Instant::now();
+        let _ = parallel.execute(state).await.unwrap();
+        let elapsed = start.elapsed();
+
+        // Should return quickly after the first one finishes
+        assert!(elapsed < Duration::from_millis(900));
     }
 }
