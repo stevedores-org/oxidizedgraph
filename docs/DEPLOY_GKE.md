@@ -40,6 +40,28 @@ kubectl -n oxidizedgraph get pods,svc,pdb,networkpolicy
 
 Local/minimal deploy without Autopilot hardening: `kubectl apply -k deploy/base`.
 
+## EKS smoke (ECR)
+
+For **linux/amd64** clusters (e.g. EKS), CI publishes Nix-built images on merge to `main` when repo secrets are set:
+
+| Secret / var | Value |
+|--------------|-------|
+| `AWS_ACCESS_KEY_ID` | IAM user/role with `ecr:*` push |
+| `AWS_SECRET_ACCESS_KEY` | matching secret |
+| Repository variable `ECR_PUBLISH` | `true` (enables `publish-ecr` job on merge to main) |
+| Workflow `ECR_REGISTRY` | `148080843892.dkr.ecr.us-east-2.amazonaws.com` |
+| Workflow `ECR_REPOSITORY` | `stevedores-org/oxidizedgraph/server` |
+
+Tags pushed: `{Cargo version}`, `{version}-{git_sha}`, `latest`.
+
+```bash
+# After merge + publish-ecr job
+kubectl -n oxidizedgraph set image deployment/oxidizedgraph \
+  oxidizedgraph=148080843892.dkr.ecr.us-east-2.amazonaws.com/stevedores-org/oxidizedgraph/server:0.2.0
+```
+
+If NetworkPolicy/PDB were previously applied into `default`, delete them and re-apply the overlay.
+
 ## API
 
 | Endpoint | Method | Purpose |

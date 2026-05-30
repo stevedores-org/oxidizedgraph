@@ -17,6 +17,11 @@ on:
 permissions:
   contents: read
 
+env:
+  AWS_REGION: us-east-2
+  ECR_REGISTRY: 148080843892.dkr.ecr.us-east-2.amazonaws.com
+  ECR_REPOSITORY: stevedores-org/oxidizedgraph/server
+
 jobs:
   kustomize:
     name: kustomize build + kubeconform
@@ -42,6 +47,27 @@ jobs:
       - name: kustomize build (gke-autopilot overlay)
         run: kustomize build deploy/overlays/gke-autopilot > /tmp/overlay.yaml
 
+      - name: Assert NetworkPolicy and PDB use oxidizedgraph namespace
+        run: |
+          python3 <<'PY'
+          import re, sys
+          text = open("/tmp/overlay.yaml").read()
+          for kind in ("NetworkPolicy", "PodDisruptionBudget"):
+              found = False
+              for m in re.finditer(
+                  rf"kind: {kind}\nmetadata:\n(?:  [^\n]+\n)*?  namespace: (\S+)",
+                  text,
+              ):
+                  found = True
+                  if m.group(1) != "oxidizedgraph":
+                      print(f"{kind} has namespace {m.group(1)!r}, want oxidizedgraph")
+                      sys.exit(1)
+              if not found:
+                  print(f"no {kind} in overlay render")
+                  sys.exit(1)
+          print("ok: NetworkPolicy and PodDisruptionBudget in namespace oxidizedgraph")
+          PY
+
       - name: kubeconform — base
         run: kubeconform -strict -summary -kubernetes-version 1.29.0 /tmp/base.yaml
 
@@ -62,3 +88,55 @@ jobs:
             extra-trusted-public-keys = nix-cache.stevedores.org-1:Y2WLZtQTgxQ2QQzUnRDkDDKX08dL3NoNZ+Ohw3jv+7I=
       - name: build server-image
         run: nix build .#server-image -L --no-link
+
+  publish-ecr:
+    name: publish linux/amd64 image to ECR
+    needs: nix
+    # Secrets cannot be referenced in job-level if; use repo variable ECR_PUBLISH=true.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.ECR_PUBLISH == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: cachix/install-nix-action@v27
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+          extra_nix_config: |
+            accept-flake-config = true
+            extra-substituters = https://nix-cache.stevedores.org
+            extra-trusted-public-keys = nix-cache.stevedores.org-1:Y2WLZtQTgxQ2QQzUnRDkDDKX08dL3NoNZ+Ohw3jv+7I=
+
+      - name: Install skopeo
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq skopeo
+
+      - name: Ensure ECR repository exists
+        run: |
+          aws ecr describe-repositories --repository-names "$ECR_REPOSITORY" >/dev/null 2>&1 \
+            || aws ecr create-repository --repository-name "$ECR_REPOSITORY"
+
+      - name: Build OCI image (linux/amd64)
+        run: nix build .#server-image -o result -L
+
+      - name: Push to ECR
+        run: |
+          mkdir -p ~/.config/containers
+          printf '%s\n' '{"default":[{"type":"insecureAcceptAnything"}]}' > ~/.config/containers/policy.json
+          VERSION=$(grep '^version' Cargo.toml | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+          IMAGE="${ECR_REGISTRY}/${ECR_REPOSITORY}"
+          TAG_SHA="${VERSION}-${GITHUB_SHA::7}"
+          aws ecr get-login-password --region "$AWS_REGION" \
+            | skopeo login "$ECR_REGISTRY" --username AWS --password-stdin
+          skopeo copy docker-archive:./result "docker://${IMAGE}:${VERSION}"
+          skopeo copy docker-archive:./result "docker://${IMAGE}:${TAG_SHA}"
+          skopeo copy docker-archive:./result "docker://${IMAGE}:latest"
+          echo "Pushed ${IMAGE}:${VERSION}, ${IMAGE}:${TAG_SHA}, ${IMAGE}:latest"
