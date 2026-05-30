@@ -193,7 +193,10 @@ impl<C: Checkpointer> StreamingRunner<C> {
                 // Emit error event
                 self.event_bus.publish(Event::graph_error(
                     thread_id,
-                    format!("Maximum iterations exceeded: {}", self.config.max_iterations),
+                    format!(
+                        "Maximum iterations exceeded: {}",
+                        self.config.max_iterations
+                    ),
                 ));
 
                 // Save checkpoint before error
@@ -214,11 +217,8 @@ impl<C: Checkpointer> StreamingRunner<C> {
                 let duration = graph_start.elapsed();
 
                 // Emit graph completed event
-                self.event_bus.publish(Event::graph_completed(
-                    thread_id,
-                    iterations,
-                    duration,
-                ));
+                self.event_bus
+                    .publish(Event::graph_completed(thread_id, iterations, duration));
 
                 info!(
                     thread_id = %thread_id,
@@ -318,7 +318,11 @@ impl<C: Checkpointer> StreamingRunner<C> {
                     let current_state = state
                         .read()
                         .map_err(|e| RuntimeError::InvalidState(e.to_string()))?;
-                    match self.graph.get_next_node(&current_node, &current_state) {
+                    match self.graph.get_next_node_for_transition(
+                        &current_node,
+                        &current_state,
+                        transitions::CONTINUE,
+                    ) {
                         Some(next) => {
                             debug!(node_id = %current_node, next = %next, "Following graph edge");
                             next
@@ -332,6 +336,29 @@ impl<C: Checkpointer> StreamingRunner<C> {
                 NodeOutput::Route(target) => {
                     debug!(node_id = %current_node, target = %target, "Node routing to target");
                     target.clone()
+                }
+                NodeOutput::Transition(key) => {
+                    let current_state = state
+                        .read()
+                        .map_err(|e| RuntimeError::InvalidState(e.to_string()))?;
+                    match self.graph.get_next_node_for_transition(
+                        &current_node,
+                        &current_state,
+                        key,
+                    ) {
+                        Some(next) => {
+                            debug!(node_id = %current_node, transition = %key, next = %next, "Following keyed graph edge");
+                            next
+                        }
+                        None => {
+                            debug!(
+                                node_id = %current_node,
+                                transition = %key,
+                                "No outgoing edge for transition, ending execution"
+                            );
+                            transitions::END.to_string()
+                        }
+                    }
                 }
             };
 
@@ -458,5 +485,63 @@ mod tests {
         // Verify checkpoint was saved
         let history = checkpointer.list("thread-1").await.unwrap();
         assert_eq!(history.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_transition_key_routing() {
+        struct TransitionNode;
+        struct MarkerNode {
+            id: String,
+        }
+
+        #[async_trait]
+        impl NodeExecutor for TransitionNode {
+            fn id(&self) -> &str {
+                "router"
+            }
+
+            async fn execute(&self, _state: SharedState) -> Result<NodeOutput, NodeError> {
+                Ok(NodeOutput::transition("success"))
+            }
+        }
+
+        #[async_trait]
+        impl NodeExecutor for MarkerNode {
+            fn id(&self) -> &str {
+                &self.id
+            }
+
+            async fn execute(&self, state: SharedState) -> Result<NodeOutput, NodeError> {
+                let mut guard = state
+                    .write()
+                    .map_err(|e| NodeError::execution_failed(e.to_string()))?;
+                guard.set_context("visited", self.id.clone());
+                Ok(NodeOutput::finish())
+            }
+        }
+
+        let graph = GraphBuilder::new()
+            .add_node(TransitionNode)
+            .add_node(MarkerNode {
+                id: "success_handler".to_string(),
+            })
+            .add_node(MarkerNode {
+                id: "error_handler".to_string(),
+            })
+            .set_entry_point("router")
+            .add_edge_with_key("router", "success_handler", "success")
+            .add_edge_with_key("router", "error_handler", "error")
+            .compile()
+            .unwrap();
+
+        let bus = Arc::new(EventBus::new());
+        let runner = StreamingRunner::new(graph, bus);
+        let result = runner.invoke("thread-1", AgentState::new()).await.unwrap();
+
+        assert!(result.is_completed());
+        assert_eq!(
+            result.state().get_context::<String>("visited"),
+            Some("success_handler".to_string())
+        );
     }
 }
