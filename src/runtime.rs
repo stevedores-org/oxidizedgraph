@@ -1,7 +1,10 @@
-//! Runtime executor for oxidizedgraph
+//! Legacy runtime executor for oxidizedgraph
 //!
-//! The `Runtime` is responsible for executing compiled graphs,
-//! managing state transitions, and handling streaming events.
+//! **DEAD CODE:** This file is NOT part of the module tree and is never compiled.
+//! It references a generic `CompiledGraph<S>` that no longer exists.
+//! Use [`GraphRunner`](crate::runner::GraphRunner) from the `runner` module instead.
+//!
+//! This file will be deleted in v0.3.0.
 
 use crate::edge::EdgeTarget;
 use crate::error::{NodeError, RuntimeError};
