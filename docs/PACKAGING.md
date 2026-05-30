@@ -50,6 +50,10 @@ Keep these in sync when releasing:
 3. `dockworker.toml` `[tags].default` and per-image `tag`
 4. `deploy/overlays/gke-autopilot/kustomization.yaml` `images.newTag`
 
+## CI / ECR (GitHub OIDC)
+
+Merge to `main` can push `linux/amd64` images to ECR when repo variable **`AWS_OIDC_ROLE_ARN`** is set (OIDC role — no `AWS_ACCESS_KEY_ID` in GitHub). Cluster pull credentials remain **ESO + Flux**.
+
 ## dockworker.toml tags
 
 - `[tags].default` and per-image `tag` track the release semver (`0.2.0`).
