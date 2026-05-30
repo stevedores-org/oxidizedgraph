@@ -5,7 +5,7 @@
 
 use async_trait::async_trait;
 use petgraph::stable_graph::{NodeIndex, StableGraph};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::fmt;
 use std::sync::Arc;
 
@@ -33,6 +33,8 @@ pub enum NodeOutput {
     Finish,
     /// Route to a specific node
     Route(String),
+    /// Follow an outgoing edge with the specified transition key
+    Transition(String),
 }
 
 impl NodeOutput {
@@ -61,6 +63,11 @@ impl NodeOutput {
         Self::Route(target.into())
     }
 
+    /// Create a transition output that follows a keyed graph edge
+    pub fn transition(key: impl Into<String>) -> Self {
+        Self::Transition(key.into())
+    }
+
     /// Check if this output signals completion
     pub fn is_terminal(&self) -> bool {
         matches!(self, Self::Finish)
@@ -69,7 +76,7 @@ impl NodeOutput {
     /// Get the target node name if this is a routing output
     pub fn target(&self) -> Option<&str> {
         match self {
-            Self::Continue(Some(s)) | Self::Route(s) => Some(s),
+            Self::Continue(Some(s)) | Self::Route(s) | Self::Transition(s) => Some(s),
             _ => None,
         }
     }
@@ -152,11 +159,13 @@ pub struct GraphEdge {
     pub from: String,
     /// Target node ID (or END constant)
     pub to: String,
+    /// Transition key required to follow this edge.
+    ///
+    /// When `None`, this edge is treated as a default path for
+    /// `transitions::CONTINUE` for backwards compatibility.
+    pub transition_key: Option<String>,
     /// Type of edge
     pub edge_type: EdgeType,
-    /// Optional transition key for deterministic routing
-    /// When set, this key is used to uniquely identify the edge for routing purposes
-    pub transition_key: Option<String>,
 }
 
 impl GraphEdge {
@@ -165,18 +174,22 @@ impl GraphEdge {
         Self {
             from: from.into(),
             to: to.into(),
-            edge_type: EdgeType::Direct,
             transition_key: None,
+            edge_type: EdgeType::Direct,
         }
     }
 
-    /// Create a new direct edge with a transition key
-    pub fn direct_with_key(from: impl Into<String>, to: impl Into<String>, key: impl Into<String>) -> Self {
+    /// Create a new direct edge with an explicit transition key.
+    pub fn direct_with_key(
+        from: impl Into<String>,
+        to: impl Into<String>,
+        transition_key: impl Into<String>,
+    ) -> Self {
         Self {
             from: from.into(),
             to: to.into(),
+            transition_key: Some(transition_key.into()),
             edge_type: EdgeType::Direct,
-            transition_key: Some(key.into()),
         }
     }
 
@@ -188,28 +201,26 @@ impl GraphEdge {
         Self {
             from: from.into(),
             to: String::new(), // Determined at runtime
-            edge_type: EdgeType::Conditional(Arc::new(router)),
             transition_key: None,
+            edge_type: EdgeType::Conditional(Arc::new(router)),
         }
     }
 
-    /// Create a new conditional edge with a transition key
-    pub fn conditional_with_key<F>(from: impl Into<String>, router: F, key: impl Into<String>) -> Self
+    /// Create a new conditional edge with an explicit transition key.
+    pub fn conditional_with_key<F>(
+        from: impl Into<String>,
+        transition_key: impl Into<String>,
+        router: F,
+    ) -> Self
     where
         F: Fn(&AgentState) -> String + Send + Sync + 'static,
     {
         Self {
             from: from.into(),
             to: String::new(), // Determined at runtime
+            transition_key: Some(transition_key.into()),
             edge_type: EdgeType::Conditional(Arc::new(router)),
-            transition_key: Some(key.into()),
         }
-    }
-
-    /// Set the transition key for this edge
-    pub fn with_key(mut self, key: impl Into<String>) -> Self {
-        self.transition_key = Some(key.into());
-        self
     }
 }
 
@@ -218,6 +229,7 @@ impl fmt::Debug for GraphEdge {
         f.debug_struct("GraphEdge")
             .field("from", &self.from)
             .field("to", &self.to)
+            .field("transition_key", &self.transition_key)
             .field(
                 "edge_type",
                 &match &self.edge_type {
@@ -287,9 +299,15 @@ impl GraphBuilder {
         self
     }
 
-    /// Add a direct edge between two nodes with a transition key
-    pub fn add_edge_with_key(mut self, from: impl Into<String>, to: impl Into<String>, key: impl Into<String>) -> Self {
-        self.edges.push(GraphEdge::direct_with_key(from, to, key));
+    /// Add a direct edge between two nodes for a specific transition key.
+    pub fn add_edge_with_key(
+        mut self,
+        from: impl Into<String>,
+        to: impl Into<String>,
+        transition_key: impl Into<String>,
+    ) -> Self {
+        self.edges
+            .push(GraphEdge::direct_with_key(from, to, transition_key));
         self
     }
 
@@ -297,13 +315,6 @@ impl GraphBuilder {
     pub fn add_edge_to_end(mut self, from: impl Into<String>) -> Self {
         self.edges
             .push(GraphEdge::direct(from, transitions::END.to_string()));
-        self
-    }
-
-    /// Add an edge from a node to the END with a transition key
-    pub fn add_edge_to_end_with_key(mut self, from: impl Into<String>, key: impl Into<String>) -> Self {
-        self.edges
-            .push(GraphEdge::direct_with_key(from, transitions::END.to_string(), key));
         self
     }
 
@@ -316,12 +327,21 @@ impl GraphBuilder {
         self
     }
 
-    /// Add a conditional edge with a router function and transition key
-    pub fn add_conditional_edge_with_key<F>(mut self, from: impl Into<String>, router: F, key: impl Into<String>) -> Self
+    /// Add a conditional edge for a specific transition key.
+    pub fn add_conditional_edge_with_key<F>(
+        mut self,
+        from: impl Into<String>,
+        transition_key: impl Into<String>,
+        router: F,
+    ) -> Self
     where
         F: Fn(&AgentState) -> String + Send + Sync + 'static,
     {
-        self.edges.push(GraphEdge::conditional_with_key(from, router, key));
+        self.edges.push(GraphEdge::conditional_with_key(
+            from,
+            transition_key,
+            router,
+        ));
         self
     }
 
@@ -331,20 +351,6 @@ impl GraphBuilder {
 
         if !self.nodes.contains_key(&entry) {
             return Err(GraphError::NodeNotFound(entry));
-        }
-
-        // Reject duplicate (from, transition_key) pairs — they would make
-        // key-based routing non-deterministic.
-        let mut seen_keys: HashSet<(&str, &str)> = HashSet::new();
-        for edge in &self.edges {
-            if let Some(key) = edge.transition_key.as_deref() {
-                if !seen_keys.insert((edge.from.as_str(), key)) {
-                    return Err(GraphError::DuplicateTransitionKey {
-                        from: edge.from.clone(),
-                        key: key.to_string(),
-                    });
-                }
-            }
         }
 
         // Build the petgraph structure using StableGraph for stable node indices
@@ -420,58 +426,44 @@ impl CompiledGraph {
     }
 
     /// Get the next node ID based on edges from the given node
-    /// Uses state-based routing for conditional edges (backward compatible)
     pub fn get_next_node(&self, from: &str, state: &AgentState) -> Option<String> {
-        self.get_next_node_with_key(from, None, state)
+        self.get_next_node_for_transition(from, state, transitions::CONTINUE)
     }
 
-    /// Get the next node ID with optional key-based edge selection.
-    ///
-    /// # Arguments
-    /// * `from` - The source node ID.
-    /// * `key` - Optional transition key. When `Some`, only an edge whose
-    ///   `transition_key` matches is considered; no fallback is attempted.
-    /// * `state` - The current agent state, used by conditional edge routers.
-    ///
-    /// # Semantics
-    /// - **Direct + key**: returns the edge's target. Fully deterministic.
-    /// - **Conditional + key**: the key selects *which* router runs; the
-    ///   router's return value is still the destination, so the result
-    ///   depends on `state`. The key makes router selection deterministic,
-    ///   not the destination.
-    /// - **`key = None`**: legacy behavior — picks the first edge from
-    ///   `from` in insertion order, regardless of whether it carries a key.
-    ///
-    /// `GraphBuilder::compile` rejects duplicate `(from, key)` pairs, so a
-    /// matching key resolves to at most one edge.
-    ///
-    /// # Returns
-    /// `Some(target)` when an edge resolves; `None` when:
-    /// - a `key` was supplied and no edge from `from` has that key, or
-    /// - no edges from `from` exist.
-    pub fn get_next_node_with_key(&self, from: &str, key: Option<&str>, state: &AgentState) -> Option<String> {
-        if let Some(transition_key) = key {
-            for edge in &self.edges {
-                if edge.from == from && edge.transition_key.as_deref() == Some(transition_key) {
-                    return match &edge.edge_type {
-                        EdgeType::Direct => Some(edge.to.clone()),
-                        EdgeType::Conditional(router) => Some(router(state)),
-                    };
-                }
+    /// Get the next node ID based on the transition key and edges.
+    pub fn get_next_node_for_transition(
+        &self,
+        from: &str,
+        state: &AgentState,
+        transition_key: &str,
+    ) -> Option<String> {
+        // First, exact transition-key match.
+        for edge in &self.edges {
+            if edge.from != from {
+                continue;
             }
-            // Key supplied but no matching edge — caller passed a key that
-            // wasn't registered. Treated as a configuration error: no fallback.
-            return None;
+            if edge.transition_key.as_deref() != Some(transition_key) {
+                continue;
+            }
+            return match &edge.edge_type {
+                EdgeType::Direct => Some(edge.to.clone()),
+                EdgeType::Conditional(router) => Some(router(state)),
+            };
         }
 
-        for edge in &self.edges {
-            if edge.from == from {
+        // Backward compatibility: unkeyed edges are default CONTINUE path.
+        if transition_key == transitions::CONTINUE {
+            for edge in &self.edges {
+                if edge.from != from || edge.transition_key.is_some() {
+                    continue;
+                }
                 return match &edge.edge_type {
                     EdgeType::Direct => Some(edge.to.clone()),
                     EdgeType::Conditional(router) => Some(router(state)),
                 };
             }
         }
+
         None
     }
 
@@ -576,6 +568,9 @@ mod tests {
 
         let output = NodeOutput::route("target");
         assert_eq!(output.target(), Some("target"));
+
+        let output = NodeOutput::transition("success");
+        assert_eq!(output.target(), Some("success"));
     }
 
     #[test]
@@ -652,6 +647,101 @@ mod tests {
     }
 
     #[test]
+    fn test_transition_key_edge_routing() {
+        let graph = GraphBuilder::new()
+            .add_node(TestNode {
+                id: "start".to_string(),
+            })
+            .add_node(TestNode {
+                id: "tool".to_string(),
+            })
+            .add_node(TestNode {
+                id: "finish".to_string(),
+            })
+            .set_entry_point("start")
+            .add_edge_with_key("start", "tool", "tool_call")
+            .add_edge_with_key("start", "finish", "finish")
+            .compile()
+            .unwrap();
+
+        let state = AgentState::new();
+        assert_eq!(
+            graph.get_next_node_for_transition("start", &state, "tool_call"),
+            Some("tool".to_string())
+        );
+        assert_eq!(
+            graph.get_next_node_for_transition("start", &state, "finish"),
+            Some("finish".to_string())
+        );
+        assert_eq!(
+            graph.get_next_node_for_transition("start", &state, "missing"),
+            None
+        );
+    }
+
+    #[test]
+    fn test_transition_key_conditional_routing() {
+        let graph = GraphBuilder::new()
+            .add_node(TestNode {
+                id: "start".to_string(),
+            })
+            .add_node(TestNode {
+                id: "branch_a".to_string(),
+            })
+            .add_node(TestNode {
+                id: "branch_b".to_string(),
+            })
+            .set_entry_point("start")
+            .add_conditional_edge_with_key("start", "route", |state: &AgentState| {
+                if state.is_complete {
+                    "branch_b".to_string()
+                } else {
+                    "branch_a".to_string()
+                }
+            })
+            .compile()
+            .unwrap();
+
+        let state = AgentState::new();
+        assert_eq!(
+            graph.get_next_node_for_transition("start", &state, "route"),
+            Some("branch_a".to_string())
+        );
+
+        let mut complete_state = AgentState::new();
+        complete_state.is_complete = true;
+        assert_eq!(
+            graph.get_next_node_for_transition("start", &complete_state, "route"),
+            Some("branch_b".to_string())
+        );
+    }
+
+    #[test]
+    fn test_unkeyed_edges_are_default_continue_path() {
+        let graph = GraphBuilder::new()
+            .add_node(TestNode {
+                id: "start".to_string(),
+            })
+            .add_node(TestNode {
+                id: "next".to_string(),
+            })
+            .set_entry_point("start")
+            .add_edge("start", "next")
+            .compile()
+            .unwrap();
+
+        let state = AgentState::new();
+        assert_eq!(
+            graph.get_next_node_for_transition("start", &state, transitions::CONTINUE),
+            Some("next".to_string())
+        );
+        assert_eq!(
+            graph.get_next_node_for_transition("start", &state, "other"),
+            None
+        );
+    }
+
+    #[test]
     fn test_mermaid_output() {
         let graph = GraphBuilder::new()
             .add_node(TestNode {
@@ -670,213 +760,5 @@ mod tests {
         assert!(mermaid.contains("graph TD"));
         assert!(mermaid.contains("node1"));
         assert!(mermaid.contains("node2"));
-    }
-
-    // Tests for transition key conformance (PR A)
-
-    #[test]
-    fn test_direct_edge_with_key() {
-        let graph = GraphBuilder::new()
-            .add_node(TestNode {
-                id: "node1".to_string(),
-            })
-            .add_node(TestNode {
-                id: "node2".to_string(),
-            })
-            .set_entry_point("node1")
-            .add_edge_with_key("node1", "node2", "next_step")
-            .compile()
-            .unwrap();
-
-        let state = AgentState::new();
-        // Without key, should find the edge (backward compatible)
-        assert_eq!(graph.get_next_node("node1", &state), Some("node2".to_string()));
-
-        // With correct key, should find the edge
-        assert_eq!(
-            graph.get_next_node_with_key("node1", Some("next_step"), &state),
-            Some("node2".to_string())
-        );
-    }
-
-    #[test]
-    fn test_missing_transition_key() {
-        let graph = GraphBuilder::new()
-            .add_node(TestNode {
-                id: "node1".to_string(),
-            })
-            .add_node(TestNode {
-                id: "node2".to_string(),
-            })
-            .set_entry_point("node1")
-            .add_edge_with_key("node1", "node2", "step_a")
-            .compile()
-            .unwrap();
-
-        let state = AgentState::new();
-        // With wrong key, should return None (key not found)
-        assert_eq!(
-            graph.get_next_node_with_key("node1", Some("step_b"), &state),
-            None
-        );
-    }
-
-    #[test]
-    fn test_multiple_keyed_edges() {
-        let graph = GraphBuilder::new()
-            .add_node(TestNode {
-                id: "router".to_string(),
-            })
-            .add_node(TestNode {
-                id: "branch_a".to_string(),
-            })
-            .add_node(TestNode {
-                id: "branch_b".to_string(),
-            })
-            .set_entry_point("router")
-            .add_edge_with_key("router", "branch_a", "path_a")
-            .add_edge_with_key("router", "branch_b", "path_b")
-            .compile()
-            .unwrap();
-
-        let state = AgentState::new();
-
-        // Resolve with key "path_a"
-        assert_eq!(
-            graph.get_next_node_with_key("router", Some("path_a"), &state),
-            Some("branch_a".to_string())
-        );
-
-        // Resolve with key "path_b"
-        assert_eq!(
-            graph.get_next_node_with_key("router", Some("path_b"), &state),
-            Some("branch_b".to_string())
-        );
-    }
-
-    #[test]
-    fn test_conditional_edge_with_key() {
-        let graph = GraphBuilder::new()
-            .add_node(TestNode {
-                id: "start".to_string(),
-            })
-            .add_node(TestNode {
-                id: "success".to_string(),
-            })
-            .add_node(TestNode {
-                id: "retry".to_string(),
-            })
-            .set_entry_point("start")
-            .add_conditional_edge_with_key("start",
-                |state: &AgentState| {
-                    if state.is_complete {
-                        "success".to_string()
-                    } else {
-                        "retry".to_string()
-                    }
-                },
-                "handle_result"
-            )
-            .compile()
-            .unwrap();
-
-        let mut state = AgentState::new();
-
-        // With key and incomplete state
-        assert_eq!(
-            graph.get_next_node_with_key("start", Some("handle_result"), &state),
-            Some("retry".to_string())
-        );
-
-        // With key and complete state
-        state.is_complete = true;
-        assert_eq!(
-            graph.get_next_node_with_key("start", Some("handle_result"), &state),
-            Some("success".to_string())
-        );
-    }
-
-    #[test]
-    fn test_backward_compatible_edge_resolution() {
-        // Test that old code without keys still works
-        let graph = GraphBuilder::new()
-            .add_node(TestNode {
-                id: "node1".to_string(),
-            })
-            .add_node(TestNode {
-                id: "node2".to_string(),
-            })
-            .set_entry_point("node1")
-            .add_edge("node1", "node2")  // Old API without key
-            .compile()
-            .unwrap();
-
-        let state = AgentState::new();
-        // Should work with old API
-        assert_eq!(graph.get_next_node("node1", &state), Some("node2".to_string()));
-    }
-
-    #[test]
-    fn test_edge_builder_with_key() {
-        let edge = GraphEdge::direct("a", "b").with_key("transition");
-        assert_eq!(edge.from, "a");
-        assert_eq!(edge.to, "b");
-        assert_eq!(edge.transition_key, Some("transition".to_string()));
-    }
-
-    #[test]
-    fn test_deterministic_key_routing() {
-        // This test validates that routing with the same key is deterministic
-        let graph = GraphBuilder::new()
-            .add_node(TestNode {
-                id: "start".to_string(),
-            })
-            .add_node(TestNode {
-                id: "target_a".to_string(),
-            })
-            .add_node(TestNode {
-                id: "target_b".to_string(),
-            })
-            .set_entry_point("start")
-            .add_edge_with_key("start", "target_a", "route_1")
-            .add_edge_with_key("start", "target_b", "route_2")
-            .compile()
-            .unwrap();
-
-        let state = AgentState::new();
-
-        // First call
-        let result1 = graph.get_next_node_with_key("start", Some("route_1"), &state);
-        // Second call with same key should return same result
-        let result2 = graph.get_next_node_with_key("start", Some("route_1"), &state);
-
-        assert_eq!(result1, result2);
-        assert_eq!(result1, Some("target_a".to_string()));
-    }
-
-    #[test]
-    fn test_duplicate_transition_key_rejected_at_compile() {
-        let result = GraphBuilder::new()
-            .add_node(TestNode {
-                id: "start".to_string(),
-            })
-            .add_node(TestNode {
-                id: "a".to_string(),
-            })
-            .add_node(TestNode {
-                id: "b".to_string(),
-            })
-            .set_entry_point("start")
-            .add_edge_with_key("start", "a", "same_key")
-            .add_edge_with_key("start", "b", "same_key")
-            .compile();
-
-        match result {
-            Err(GraphError::DuplicateTransitionKey { from, key }) => {
-                assert_eq!(from, "start");
-                assert_eq!(key, "same_key");
-            }
-            other => panic!("expected DuplicateTransitionKey, got {:?}", other.map(|_| "Ok")),
-        }
     }
 }

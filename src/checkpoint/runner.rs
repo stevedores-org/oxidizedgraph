@@ -282,7 +282,11 @@ impl<C: Checkpointer> CheckpointingRunner<C> {
                     let current_state = state
                         .read()
                         .map_err(|e| RuntimeError::InvalidState(e.to_string()))?;
-                    match self.graph.get_next_node(&current_node, &current_state) {
+                    match self.graph.get_next_node_for_transition(
+                        &current_node,
+                        &current_state,
+                        transitions::CONTINUE,
+                    ) {
                         Some(next) => {
                             debug!(node_id = %current_node, next = %next, "Following graph edge");
                             next
@@ -299,6 +303,29 @@ impl<C: Checkpointer> CheckpointingRunner<C> {
                 NodeOutput::Route(target) => {
                     debug!(node_id = %current_node, target = %target, "Node routing to target");
                     target.clone()
+                }
+                NodeOutput::Transition(key) => {
+                    let current_state = state
+                        .read()
+                        .map_err(|e| RuntimeError::InvalidState(e.to_string()))?;
+                    match self.graph.get_next_node_for_transition(
+                        &current_node,
+                        &current_state,
+                        key,
+                    ) {
+                        Some(next) => {
+                            debug!(node_id = %current_node, transition = %key, next = %next, "Following keyed graph edge");
+                            next
+                        }
+                        None => {
+                            debug!(
+                                node_id = %current_node,
+                                transition = %key,
+                                "No outgoing edge for transition, ending execution"
+                            );
+                            transitions::END.to_string()
+                        }
+                    }
                 }
             };
 
@@ -431,5 +458,63 @@ mod tests {
         assert!(result.is_completed());
         // Should have run all three nodes again
         assert_eq!(result.state().get_context::<i32>("count"), Some(3));
+    }
+
+    #[tokio::test]
+    async fn test_transition_key_routing() {
+        struct TransitionNode;
+        struct MarkerNode {
+            id: String,
+        }
+
+        #[async_trait]
+        impl NodeExecutor for TransitionNode {
+            fn id(&self) -> &str {
+                "router"
+            }
+
+            async fn execute(&self, _state: SharedState) -> Result<NodeOutput, NodeError> {
+                Ok(NodeOutput::transition("success"))
+            }
+        }
+
+        #[async_trait]
+        impl NodeExecutor for MarkerNode {
+            fn id(&self) -> &str {
+                &self.id
+            }
+
+            async fn execute(&self, state: SharedState) -> Result<NodeOutput, NodeError> {
+                let mut guard = state
+                    .write()
+                    .map_err(|e| NodeError::execution_failed(e.to_string()))?;
+                guard.set_context("visited", self.id.clone());
+                Ok(NodeOutput::finish())
+            }
+        }
+
+        let graph = GraphBuilder::new()
+            .add_node(TransitionNode)
+            .add_node(MarkerNode {
+                id: "success_handler".to_string(),
+            })
+            .add_node(MarkerNode {
+                id: "error_handler".to_string(),
+            })
+            .set_entry_point("router")
+            .add_edge_with_key("router", "success_handler", "success")
+            .add_edge_with_key("router", "error_handler", "error")
+            .compile()
+            .unwrap();
+
+        let checkpointer = Arc::new(MemoryCheckpointer::new());
+        let runner = CheckpointingRunner::new(graph, checkpointer).checkpoint_every_node();
+        let result = runner.invoke("thread-1", AgentState::new()).await.unwrap();
+
+        assert!(result.is_completed());
+        assert_eq!(
+            result.state().get_context::<String>("visited"),
+            Some("success_handler".to_string())
+        );
     }
 }
