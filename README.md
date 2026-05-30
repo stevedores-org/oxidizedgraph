@@ -191,4 +191,4 @@ See [docs/DEPLOY_GKE.md](docs/DEPLOY_GKE.md) and [docs/PACKAGING.md](docs/PACKAG
 
 ## Contributing
 
-Contributions welcome! Please open an issue or PR.
+See `CONTRIBUTING.md` for a practical start-contributing map and workflow.
