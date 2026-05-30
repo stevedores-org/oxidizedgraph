@@ -1,6 +1,6 @@
 # oxidizedgraph on OCI + GKE Autopilot
 
-Package and run **oxidizedgraph-server** on Kubernetes using **Nix OCI images** and **Kustomize** (no Helm). The legacy `Dockerfile` remains for reference; prefer `flake.nix` + `dockworker.toml`.
+Package and run **oxidizedgraph-server** on Kubernetes using **Nix OCI images** and **Kustomize** (no Helm). **No Dockerfile** — build with `flake.nix` and publish via `dockworker.toml` (see [PACKAGING.md](PACKAGING.md)).
 
 ## Build & push
 
