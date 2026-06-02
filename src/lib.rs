@@ -43,12 +43,15 @@
 pub mod checkpoint;
 pub mod error;
 pub mod events;
+pub mod execution;
 pub mod git;
 pub mod graph;
+pub mod guardrails;
 pub mod nodes;
 pub mod orchestration;
 pub mod runner;
 pub mod state;
+pub mod tools;
 
 // Deprecated modules — will be removed in v0.3.0
 // These contain an unused generic implementation that predates the

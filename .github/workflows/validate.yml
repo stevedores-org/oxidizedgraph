@@ -23,6 +23,19 @@ env:
   ECR_REPOSITORY: stevedores-org/oxidizedgraph/server
 
 jobs:
+  rust:
+    name: cargo test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: cargo test
+        run: cargo test --all-targets
+
   kustomize:
     name: kustomize build + kubeconform
     runs-on: ubuntu-latest
