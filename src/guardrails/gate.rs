@@ -204,10 +204,13 @@ impl QualityGateNode {
 
 fn truncate_log(s: &str, max: usize) -> String {
     if s.len() <= max {
-        s.to_string()
-    } else {
-        format!("{}…", &s[..max])
+        return s.to_string();
     }
+    let mut end = max;
+    while end > 0 && !s.is_char_boundary(end) {
+        end -= 1;
+    }
+    format!("{}…", &s[..end])
 }
 
 #[async_trait]
@@ -233,25 +236,19 @@ impl NodeExecutor for QualityGateNode {
             .risk_classifier
             .merge_blocker(gate_result.passed, risk);
 
+        let gates_passed_for_route =
+            gate_result.passed || !self.config.block_on_failure;
+        let route = RiskClassifier::approval_route(risk, gates_passed_for_route);
+
         {
             let mut guard = state
                 .write()
                 .map_err(|e| NodeError::execution_failed(e.to_string()))?;
             guard.set_context("gate_result", gate_result.clone());
-            guard.set_context("change_risk_level", format!("{:?}", risk));
+            guard.set_context("change_risk_level", risk);
             guard.set_context("merge_blocker", merge_blocker.clone());
             guard.set_context("gate_passed", gate_result.passed);
         }
-
-        let route = if merge_blocker.blocked {
-            if !gate_result.passed {
-                "gate_failed"
-            } else {
-                "needs_approval"
-            }
-        } else {
-            "passed"
-        };
 
         Ok(NodeOutput::transition(route))
     }
@@ -264,6 +261,7 @@ impl NodeExecutor for QualityGateNode {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::guardrails::risk::RiskLevel;
     use crate::state::AgentState;
     use std::sync::RwLock;
 
@@ -330,5 +328,38 @@ mod tests {
         let state = Arc::new(RwLock::new(agent_state));
         let output = node.execute(state).await.unwrap();
         assert_eq!(output.target(), Some("needs_approval"));
+    }
+
+    #[tokio::test]
+    async fn test_medium_risk_routes_review_when_gates_pass() {
+        let config = QualityGateConfig {
+            checks: vec![CommandSpec {
+                name: "mock_check".to_string(),
+                program: "true".to_string(),
+                args: vec![],
+            }],
+            block_on_failure: true,
+        };
+        let runner = Arc::new(MockCommandRunner::new().with_result("mock_check", 0, "ok"));
+        let node = QualityGateNode::with_runner("gate", config, runner);
+
+        let mut agent_state = AgentState::new();
+        agent_state.set_context(
+            "change_risk",
+            ChangeRisk {
+                files_changed: 10,
+                used_shell: true,
+                ..Default::default()
+            },
+        );
+        let state = Arc::new(RwLock::new(agent_state));
+        let output = node.execute(state.clone()).await.unwrap();
+        assert_eq!(output.target(), Some("review"));
+
+        let guard = state.read().unwrap();
+        assert_eq!(
+            guard.get_context::<RiskLevel>("change_risk_level"),
+            Some(RiskLevel::Medium)
+        );
     }
 }
