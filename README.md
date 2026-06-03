@@ -158,7 +158,12 @@ cargo run --example simple_workflow
 
 # ReAct agent pattern
 cargo run --example react_agent
+
+# Autonomous dev workflow (Issue #18 Phase 1)
+cargo run --example autonomous_dev_workflow
 ```
+
+See [docs/ROADMAP-18.md](docs/ROADMAP-18.md) for the autonomous agent orchestration roadmap ([#18](https://github.com/stevedores-org/oxidizedgraph/issues/18)).
 
 ## Feature Roadmap
 
@@ -168,9 +173,10 @@ cargo run --example react_agent
 - [x] Conditional edges
 - [x] GraphRunner execution
 - [x] Built-in nodes (LLM, Tool, Conditional, Function)
-- [ ] Checkpointing (SQLite, Postgres)
-- [ ] LLM integrations (Anthropic, OpenAI)
-- [ ] Streaming execution
+- [x] Checkpointing (memory; optional SurrealDB persistence)
+- [x] Streaming execution and events
+- [x] Autonomous orchestration Phase 1 — traced execution, tool policy, quality gates ([#18](https://github.com/stevedores-org/oxidizedgraph/issues/18))
+- [ ] LLM integrations (Anthropic, OpenAI) — production providers
 - [ ] WASM compilation
 - [ ] Python bindings (PyO3)
 

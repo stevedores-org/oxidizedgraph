@@ -7,10 +7,13 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Duration;
+use tokio::time::timeout;
 
 use crate::error::NodeError;
 use crate::graph::{NodeExecutor, NodeOutput};
 use crate::state::{Message, SharedState, ToolCall};
+use crate::tools::policy::{PolicyDecision, ToolPolicyEngine};
 
 /// Result of a tool execution
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -130,13 +133,81 @@ impl ToolRegistry {
 
     /// Execute a tool call
     pub async fn execute(&self, call: &ToolCall) -> ToolResult {
+        self.execute_with_policy(call, None, None).await
+    }
+
+    /// Execute a tool call with optional policy and timeout.
+    pub async fn execute_with_policy(
+        &self,
+        call: &ToolCall,
+        policy: Option<&ToolPolicyEngine>,
+        tool_timeout: Option<Duration>,
+    ) -> ToolResult {
+        if let Some(engine) = policy {
+            let cmd_hint = call.arguments.get("command").and_then(|v| v.as_str());
+            match engine.evaluate(&call.name, cmd_hint) {
+                Ok(PolicyDecision::Allow) => {}
+                Ok(PolicyDecision::RequireApproval) => {
+                    return ToolResult::error(
+                        &call.id,
+                        format!("Tool '{}' requires human approval before execution", call.name),
+                    );
+                }
+                Ok(PolicyDecision::Deny) => {
+                    return ToolResult::error(
+                        &call.id,
+                        format!("Tool '{}' denied by policy", call.name),
+                    );
+                }
+                Err(violation) => {
+                    return ToolResult::error(&call.id, violation.message());
+                }
+            }
+        }
+
         match self.get(&call.name) {
-            Some(tool) => match tool.execute(call.arguments.clone()).await {
-                Ok(result) => ToolResult::success(&call.id, result),
-                Err(e) => ToolResult::error(&call.id, e.to_string()),
-            },
+            Some(tool) => {
+                let exec = tool.execute(call.arguments.clone());
+                let result = if let Some(dur) = tool_timeout {
+                    match timeout(dur, exec).await {
+                        Ok(r) => r,
+                        Err(_) => Err(NodeError::Timeout(dur)),
+                    }
+                } else {
+                    exec.await
+                };
+                match result {
+                    Ok(content) => ToolResult::success(&call.id, content),
+                    Err(e) => ToolResult::error(&call.id, e.to_string()),
+                }
+            }
             None => ToolResult::error(&call.id, format!("Tool '{}' not found", call.name)),
         }
+    }
+}
+
+/// Configuration for tool node execution bounds.
+#[derive(Clone, Debug, Default)]
+pub struct ToolNodeConfig {
+    /// Per-tool execution timeout
+    pub tool_timeout: Option<Duration>,
+    /// Optional policy engine
+    pub policy: Option<ToolPolicyEngine>,
+}
+
+impl ToolNodeConfig {
+    /// Create config with timeout.
+    pub fn with_timeout(timeout: Duration) -> Self {
+        Self {
+            tool_timeout: Some(timeout),
+            policy: None,
+        }
+    }
+
+    /// Attach a policy engine.
+    pub fn with_policy(mut self, policy: ToolPolicyEngine) -> Self {
+        self.policy = Some(policy);
+        self
     }
 }
 
@@ -144,6 +215,7 @@ impl ToolRegistry {
 pub struct ToolNode {
     id: String,
     registry: ToolRegistry,
+    config: ToolNodeConfig,
 }
 
 impl ToolNode {
@@ -152,6 +224,16 @@ impl ToolNode {
         Self {
             id: id.into(),
             registry,
+            config: ToolNodeConfig::default(),
+        }
+    }
+
+    /// Create a tool node with execution configuration.
+    pub fn with_config(id: impl Into<String>, registry: ToolRegistry, config: ToolNodeConfig) -> Self {
+        Self {
+            id: id.into(),
+            registry,
+            config,
         }
     }
 }
@@ -178,7 +260,14 @@ impl NodeExecutor for ToolNode {
         // Execute each tool call
         let mut results = Vec::new();
         for call in &tool_calls {
-            let result = self.registry.execute(call).await;
+            let result = self
+                .registry
+                .execute_with_policy(
+                    call,
+                    self.config.policy.as_ref(),
+                    self.config.tool_timeout,
+                )
+                .await;
             results.push(result);
         }
 
@@ -407,5 +496,26 @@ mod tests {
         let guard = shared.read().unwrap();
         assert!(guard.tool_calls.is_empty()); // Cleared
         assert_eq!(guard.messages.len(), 1); // Tool result added
+    }
+
+    #[tokio::test]
+    async fn test_tool_node_policy_denial() {
+        use crate::tools::policy::{ToolExecutionPolicy, ToolPolicyEngine};
+
+        let tool = FunctionTool::new("shell", "shell", serde_json::json!({}), |_| Ok("ok".into()));
+        let registry = ToolRegistry::new().register(tool);
+        let policy = ToolPolicyEngine::new(ToolExecutionPolicy::default()); // fail closed
+        let config = ToolNodeConfig::default().with_policy(policy);
+        let node = ToolNode::with_config("tools", registry, config);
+
+        let mut state = AgentState::new();
+        state
+            .tool_calls
+            .push(ToolCall::new("1", "shell", serde_json::json!({})));
+
+        let shared = Arc::new(RwLock::new(state));
+        node.execute(shared.clone()).await.unwrap();
+        let guard = shared.read().unwrap();
+        assert!(guard.messages[0].content.contains("Policy denied"));
     }
 }
