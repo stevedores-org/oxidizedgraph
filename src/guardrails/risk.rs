@@ -88,7 +88,7 @@ impl RiskClassifier {
         }
     }
 
-    /// Transition key for routing after risk evaluation.
+    /// Transition key for routing after risk evaluation (matches graph edge keys).
     pub fn approval_route(risk: RiskLevel, gates_passed: bool) -> &'static str {
         if !gates_passed {
             return "gate_failed";
@@ -96,7 +96,7 @@ impl RiskClassifier {
         match risk {
             RiskLevel::High => "needs_approval",
             RiskLevel::Medium => "review",
-            RiskLevel::Low => "auto_continue",
+            RiskLevel::Low => "passed",
         }
     }
 }
@@ -120,5 +120,13 @@ mod tests {
         let classifier = RiskClassifier::new();
         let blocker = classifier.merge_blocker(false, RiskLevel::Low);
         assert!(blocker.blocked);
+    }
+
+    #[test]
+    fn test_approval_route_medium_risk() {
+        assert_eq!(
+            RiskClassifier::approval_route(RiskLevel::Medium, true),
+            "review"
+        );
     }
 }

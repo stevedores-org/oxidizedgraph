@@ -29,9 +29,11 @@ use oxidizedgraph::prelude::*;
 let runner = TracedRunner::with_context(graph, RunContext::new(), RunnerConfig::default());
 let result = runner.invoke(AgentState::new()).await?;
 
-// Quality gate in graph
+// Quality gate in graph (routes: passed | review | needs_approval | gate_failed)
 let gate = QualityGateNode::new("quality_gate", QualityGateConfig::rust_defaults());
 ```
+
+Quality gates use `RiskClassifier::approval_route` so medium-risk changes route to a `review` edge when checks pass.
 
 ## Delivery Phases (Remaining)
 

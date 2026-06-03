@@ -53,15 +53,18 @@ async fn main() -> anyhow::Result<()> {
         .add_node(QualityGateNode::new("quality_gate", gate_config))
         .add_node(StaticTransitionNode::new("ship", "done"))
         .add_node(StaticTransitionNode::new("human_review", "done"))
+        .add_node(EchoNode::new("review", "Queued for optional human review"))
         .add_node(StaticTransitionNode::new("fix_loop", "implement"))
         .add_node(EchoNode::new("done", "Workflow complete — ready to open PR"))
         .set_entry_point("implement")
         .add_edge("implement", "quality_gate")
         .add_edge_with_key("quality_gate", "ship", "passed")
         .add_edge_with_key("quality_gate", "human_review", "needs_approval")
+        .add_edge_with_key("quality_gate", "review", "review")
         .add_edge_with_key("quality_gate", "fix_loop", "gate_failed")
         .add_edge_to_end("ship")
         .add_edge_to_end("human_review")
+        .add_edge_to_end("review")
         .add_edge("fix_loop", "implement")
         .compile()?;
 
