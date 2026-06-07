@@ -9,10 +9,12 @@ on:
       - "Cargo.toml"
       - "Cargo.lock"
       - "src/**"
+      - "tests/**"
+      - "examples/**"
       - "dockworker.toml"
       - ".github/workflows/validate.yml"
   push:
-    branches: [main]
+    branches: [main, develop]
 
 permissions:
   contents: read
@@ -35,6 +37,9 @@ jobs:
 
       - name: cargo test
         run: cargo test --all-targets
+
+      - name: cargo clippy
+        run: cargo clippy --all-targets -- -D warnings
 
   kustomize:
     name: kustomize build + kubeconform
@@ -59,6 +64,20 @@ jobs:
 
       - name: kustomize build (gke-autopilot overlay)
         run: kustomize build deploy/overlays/gke-autopilot > /tmp/overlay.yaml
+
+      - name: kustomize build (eks overlay)
+        run: kustomize build deploy/overlays/eks > /tmp/eks.yaml
+
+      - name: Assert EKS overlay uses ECR image and amd64 scheduling
+        run: |
+          VERSION=$(cargo metadata --no-deps --format-version 1 \
+            | jq -r '.packages[] | select(.name=="oxidizedgraph") | .version')
+          if [[ -z "$VERSION" ]]; then
+            echo "::error::Failed to parse package version from cargo metadata"
+            exit 1
+          fi
+          grep -q "148080843892.dkr.ecr.us-east-2.amazonaws.com/stevedores-org/oxidizedgraph/server:${VERSION}" /tmp/eks.yaml
+          grep -q 'kubernetes.io/arch: amd64' /tmp/eks.yaml
 
       - name: Assert NetworkPolicy and PDB use oxidizedgraph namespace
         run: |
@@ -86,6 +105,9 @@ jobs:
 
       - name: kubeconform — overlay
         run: kubeconform -strict -summary -kubernetes-version 1.29.0 /tmp/overlay.yaml
+
+      - name: kubeconform — eks overlay
+        run: kubeconform -strict -summary -kubernetes-version 1.29.0 /tmp/eks.yaml
 
   nix:
     name: nix build .#server-image

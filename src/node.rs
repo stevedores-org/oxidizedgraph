@@ -286,6 +286,7 @@ where
     since = "0.2.0",
     note = "This type is unused and will be removed in 0.3.0."
 )]
+#[allow(clippy::type_complexity)]
 /// A node that wraps another node with middleware-like behavior.
 pub struct WrappedNode<S: State, Inner: Node<S>> {
     inner: Inner,
@@ -353,6 +354,8 @@ impl<S: State, Inner: Node<S>> Node<S> for WrappedNode<S, Inner> {
 
 #[cfg(test)]
 mod tests {
+    #![allow(deprecated)]
+
     use super::*;
     use serde::{Deserialize, Serialize};
 
@@ -368,6 +371,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[allow(deprecated)]
     async fn test_node_result() {
         let state = TestState { counter: 42 };
 
@@ -386,6 +390,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[allow(deprecated)]
     async fn test_retry_config() {
         let config = RetryConfig::new(5)
             .with_initial_delay(Duration::from_millis(50))

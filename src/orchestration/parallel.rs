@@ -305,6 +305,19 @@ impl NodeExecutor for ParallelSubgraphs {
         // Execute all subgraphs
         let results = self.execute_all(&parent_state).await;
 
+        if let Some((id, result)) = results.iter().find(|(_, r)| r.is_failed()) {
+            let message = match result {
+                SubgraphResult::Failed { error, .. } => {
+                    format!("Subgraph '{id}' failed: {error}")
+                }
+                SubgraphResult::Cancelled { .. } => {
+                    format!("Subgraph '{id}' was cancelled")
+                }
+                _ => format!("Subgraph '{id}' failed"),
+            };
+            return Err(NodeError::execution_failed(message));
+        }
+
         debug!(
             node_id = %self.id,
             completed = results.iter().filter(|(_, r)| r.is_completed()).count(),
@@ -433,11 +446,30 @@ mod tests {
 
         let state = Arc::new(RwLock::new(AgentState::new()));
         let start = Instant::now();
-        let _ = parallel.execute(state).await.unwrap();
+        let result = parallel.execute(state).await;
         let elapsed = start.elapsed();
 
+        assert!(result.is_err());
         // Should return quickly due to fail-fast, not wait for the 1000ms subgraph
         assert!(elapsed < Duration::from_millis(900));
+    }
+
+    #[tokio::test]
+    async fn test_parallel_wait_all_propagates_failure() {
+        let parallel = ParallelSubgraphs::new("parallel")
+            .add_subgraph("ok", create_delayed_graph("ok", "k", "v", 10))
+            .add_subgraph("fail", GraphBuilder::new()
+                .add_node(crate::nodes::function::FunctionNode::new("fail", |_| async {
+                    Err(NodeError::execution_failed("intentional failure"))
+                }))
+                .set_entry_point("fail")
+                .compile()
+                .unwrap())
+            .with_join_strategy(JoinStrategy::WaitAll);
+
+        let state = Arc::new(RwLock::new(AgentState::new()));
+        let result = parallel.execute(state).await;
+        assert!(result.is_err());
     }
 
     #[tokio::test]

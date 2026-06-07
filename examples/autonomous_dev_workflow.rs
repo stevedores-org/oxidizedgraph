@@ -62,9 +62,8 @@ async fn main() -> anyhow::Result<()> {
         .add_edge_with_key("quality_gate", "human_review", "needs_approval")
         .add_edge_with_key("quality_gate", "review", "review")
         .add_edge_with_key("quality_gate", "fix_loop", "gate_failed")
-        .add_edge_to_end("ship")
-        .add_edge_to_end("human_review")
-        .add_edge_to_end("review")
+        .add_edge("review", "done")
+        .add_edge_to_end("done")
         .add_edge("fix_loop", "implement")
         .compile()?;
 

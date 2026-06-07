@@ -8,7 +8,7 @@ mod traced_runner;
 mod transition;
 mod validation;
 
-pub use replay::{ReplayReport, ReplayRunner};
+pub use replay::{output_from_record, ReplayReport, ReplayRunner};
 pub use traced_runner::{TracedRunResult, TracedRunner};
 pub use transition::{RunContext, TransitionLog, TransitionRecord};
 pub use validation::{StateValidator, ValidationError};

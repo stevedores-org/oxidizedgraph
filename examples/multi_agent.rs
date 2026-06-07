@@ -92,7 +92,7 @@ impl NodeExecutor for SynthesizerNode {
 
 fn create_researcher_graph(topic: &str, delay_ms: u64) -> CompiledGraph {
     GraphBuilder::new()
-        .name(&format!("{}_researcher", topic))
+        .name(format!("{}_researcher", topic))
         .add_node(ResearcherNode {
             id: "research".to_string(),
             topic: topic.to_string(),
@@ -207,7 +207,7 @@ async fn main() -> anyhow::Result<()> {
     let spawner = SubgraphSpawner::new();
 
     // Dynamically decide what to research based on runtime conditions
-    let topics = vec!["machine_learning", "databases", "networking"];
+    let topics = ["machine_learning", "databases", "networking"];
 
     println!("Spawning {} research tasks dynamically...", topics.len());
 

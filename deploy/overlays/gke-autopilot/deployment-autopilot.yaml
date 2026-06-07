@@ -6,6 +6,8 @@ spec:
   replicas: 2
   template:
     spec:
+      nodeSelector:
+        kubernetes.io/arch: amd64
       affinity:
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:

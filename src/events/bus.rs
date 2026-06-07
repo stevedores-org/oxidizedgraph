@@ -45,10 +45,7 @@ impl EventBus {
     /// Returns the number of subscribers that received the event.
     /// If there are no subscribers, the event is dropped.
     pub fn publish(&self, event: Event) -> usize {
-        match self.sender.send(event) {
-            Ok(count) => count,
-            Err(_) => 0, // No active receivers
-        }
+        self.sender.send(event).unwrap_or(0)
     }
 
     /// Subscribe to events
@@ -119,10 +116,7 @@ impl EventReceiver {
     /// Returns `None` if no event is available or channel is closed.
     pub fn try_recv(&mut self) -> Option<Event> {
         let receiver = self.receiver.as_mut()?;
-        match receiver.try_recv() {
-            Ok(event) => Some(event),
-            Err(_) => None,
-        }
+        receiver.try_recv().ok()
     }
 
     /// Receive events as a stream

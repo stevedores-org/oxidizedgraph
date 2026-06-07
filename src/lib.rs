@@ -1,6 +1,7 @@
 //! # oxidizedgraph
 //!
 //! A humble attempt at LangGraph in Rust - high-performance agent orchestration framework.
+#![cfg_attr(test, allow(deprecated))]
 //!
 //! oxidizedgraph provides graph-based agent workflows with:
 //! - **Type-safe state management** with `AgentState` and `SharedState`

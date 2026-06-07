@@ -74,6 +74,8 @@ pub struct TransitionRecord {
     pub output_kind: String,
     /// Next node after routing (if known)
     pub next_node: Option<String>,
+    /// Transition key or explicit route target from the node output
+    pub output_target: Option<String>,
     /// State iteration counter after this step
     pub state_iteration: usize,
     /// Timestamp when the transition was recorded
@@ -96,6 +98,7 @@ impl TransitionRecord {
             node_id: node_id.to_string(),
             output_kind: output_kind_label(output).to_string(),
             next_node: next_node.map(|s| s.to_string()),
+            output_target: output.target().map(|s| s.to_string()),
             state_iteration,
             recorded_at: Utc::now(),
         }
