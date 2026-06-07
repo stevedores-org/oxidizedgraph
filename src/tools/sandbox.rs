@@ -105,7 +105,11 @@ impl SandboxExecutor for SubprocessSandbox {
         }
 
         let mut cmd = Command::new("sh");
-        cmd.arg("-c").arg(command).stdout(Stdio::piped()).stderr(Stdio::piped());
+        cmd.arg("-c")
+            .arg(command)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .kill_on_drop(true);
         if let Some(dir) = working_dir {
             cmd.current_dir(dir);
         }

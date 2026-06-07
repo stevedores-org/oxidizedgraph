@@ -6,7 +6,6 @@
 //! This module will be removed in v0.3.0.
 
 use crate::state::State;
-use std::sync::Arc;
 
 /// Target specification for an edge
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -154,6 +153,8 @@ impl<S: State> Edge<S> {
 
 #[cfg(test)]
 mod tests {
+    #![allow(deprecated)]
+
     use super::*;
     use serde::{Deserialize, Serialize};
 
@@ -169,6 +170,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn test_edge_target() {
         let target = EdgeTarget::node("my_node");
         assert_eq!(target.node_id(), Some("my_node"));
@@ -180,6 +182,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn test_direct_edge() {
         let edge: Edge<TestState> = Edge::to_node("next");
         let state = TestState::default();
@@ -188,6 +191,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn test_conditional_edge() {
         let edge: Edge<TestState> = Edge::conditional_fn(|s: &TestState| {
             if s.go_to_end {
@@ -221,6 +225,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn test_router_trait() {
         let edge: Edge<TestState> = Edge::conditional(TestRouter);
 

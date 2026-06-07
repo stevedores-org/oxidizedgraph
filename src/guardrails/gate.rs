@@ -232,13 +232,9 @@ impl NodeExecutor for QualityGateNode {
         };
 
         let risk = self.risk_classifier.classify(&change_risk);
-        let merge_blocker = self
-            .risk_classifier
-            .merge_blocker(gate_result.passed, risk);
-
-        let gates_passed_for_route =
-            gate_result.passed || !self.config.block_on_failure;
-        let route = RiskClassifier::approval_route(risk, gates_passed_for_route);
+        let effective_pass = gate_result.passed || !self.config.block_on_failure;
+        let route = RiskClassifier::approval_route(risk, effective_pass);
+        let merge_blocker = self.risk_classifier.merge_blocker(effective_pass, risk);
 
         {
             let mut guard = state
@@ -361,5 +357,30 @@ mod tests {
             guard.get_context::<RiskLevel>("change_risk_level"),
             Some(RiskLevel::Medium)
         );
+    }
+
+    #[tokio::test]
+    async fn test_non_blocking_failure_still_marks_merge_blocker() {
+        let config = QualityGateConfig {
+            checks: vec![CommandSpec {
+                name: "mock_check".to_string(),
+                program: "false".to_string(),
+                args: vec![],
+            }],
+            block_on_failure: false,
+        };
+        let runner = Arc::new(MockCommandRunner::new().with_result("mock_check", 1, "failed"));
+        let node = QualityGateNode::with_runner("gate", config, runner);
+
+        let state = Arc::new(RwLock::new(AgentState::new()));
+        let output = node.execute(state.clone()).await.unwrap();
+        assert_eq!(output.target(), Some("passed"));
+
+        let guard = state.read().unwrap();
+        assert_eq!(guard.get_context::<bool>("gate_passed"), Some(false));
+        let blocker = guard
+            .get_context::<crate::guardrails::risk::MergeBlocker>("merge_blocker")
+            .expect("merge_blocker");
+        assert!(!blocker.blocked);
     }
 }

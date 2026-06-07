@@ -2,7 +2,7 @@
 
 use crate::graph::NodeOutput;
 
-use super::transition::TransitionLog;
+use super::transition::{TransitionLog, TransitionRecord};
 
 /// Report from comparing an expected trace to an actual trace.
 #[derive(Clone, Debug, PartialEq)]
@@ -83,14 +83,27 @@ impl ReplayRunner {
     }
 }
 
-/// Stub output for replay tooling from recorded kind labels.
-#[allow(dead_code)]
-pub fn output_from_kind(kind: &str) -> NodeOutput {
-    match kind {
+/// Reconstruct node output from a recorded transition.
+pub fn output_from_record(record: &TransitionRecord) -> NodeOutput {
+    match record.output_kind.as_str() {
         "finish" => NodeOutput::finish(),
-        "continue_to" => NodeOutput::cont(),
-        "route" => NodeOutput::cont(),
-        "transition" => NodeOutput::transition("replay"),
+        "continue" => NodeOutput::cont(),
+        "continue_to" => record
+            .next_node
+            .as_ref()
+            .map(|node| NodeOutput::continue_to(node.clone()))
+            .unwrap_or_else(NodeOutput::cont),
+        "route" => record
+            .output_target
+            .as_ref()
+            .or(record.next_node.as_ref())
+            .map(|target| NodeOutput::route(target.clone()))
+            .unwrap_or_else(NodeOutput::cont),
+        "transition" => record
+            .output_target
+            .as_ref()
+            .map(|key| NodeOutput::transition(key.clone()))
+            .unwrap_or_else(|| NodeOutput::transition("unknown")),
         _ => NodeOutput::cont(),
     }
 }
@@ -99,6 +112,23 @@ pub fn output_from_kind(kind: &str) -> NodeOutput {
 mod tests {
     use super::*;
     use super::super::transition::TransitionRecord;
+
+    #[test]
+    fn test_output_from_record_preserves_transition_key() {
+        let record = TransitionRecord {
+            run_id: "r".to_string(),
+            iteration: 0,
+            node_id: "gate".to_string(),
+            output_kind: "transition".to_string(),
+            next_node: Some("ship".to_string()),
+            output_target: Some("passed".to_string()),
+            state_iteration: 1,
+            recorded_at: chrono::Utc::now(),
+        };
+
+        let output = output_from_record(&record);
+        assert_eq!(output.target(), Some("passed"));
+    }
 
     #[test]
     fn test_replay_compare_matching_logs() {

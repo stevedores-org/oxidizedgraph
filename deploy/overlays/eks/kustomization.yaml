@@ -1,0 +1,11 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# EKS smoke/prod: same Autopilot hardening as gke-autopilot, image from CI ECR (linux/amd64).
+resources:
+  - ../gke-autopilot
+
+images:
+  - name: ghcr.io/stevedores-org/oxidizedgraph/server
+    newName: 148080843892.dkr.ecr.us-east-2.amazonaws.com/stevedores-org/oxidizedgraph/server
+    newTag: "0.2.0"
