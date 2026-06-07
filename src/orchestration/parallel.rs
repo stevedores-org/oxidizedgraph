@@ -24,7 +24,10 @@ pub enum JoinStrategy {
     WaitFirst,
     /// Return as soon as any subgraph fails (fail-fast)
     FailFast,
-    /// Wait for a specific number of subgraphs to complete
+    /// Return once `n` subgraphs complete successfully; abort the rest.
+    ///
+    /// Failed or cancelled subgraphs do not count toward `n`. The first failure
+    /// aborts remaining work and returns immediately (same as [`JoinStrategy::FailFast`]).
     WaitN(usize),
 }
 
@@ -255,6 +258,13 @@ impl ParallelSubgraphs {
             JoinStrategy::WaitN(n) => {
                 let mut completed = 0;
                 while let Some((id, result)) = futures.next().await {
+                    if result.is_failed() {
+                        results.push((id, result));
+                        for handle in abort_handles {
+                            handle.abort();
+                        }
+                        return results;
+                    }
                     if result.is_completed() {
                         completed += 1;
                     }
@@ -485,6 +495,49 @@ mod tests {
         let elapsed = start.elapsed();
 
         // Should return quickly after the first one finishes
+        assert!(elapsed < Duration::from_millis(900));
+    }
+
+    #[tokio::test]
+    async fn test_parallel_wait_n_returns_after_n_successes() {
+        let parallel = ParallelSubgraphs::new("parallel")
+            .add_subgraph("fast", create_delayed_graph("fast", "fast", "v", 10))
+            .add_subgraph("medium", create_delayed_graph("medium", "medium", "v", 30))
+            .add_subgraph("slow", create_delayed_graph("slow", "slow", "v", 1000))
+            .with_join_strategy(JoinStrategy::WaitN(2));
+
+        let state = Arc::new(RwLock::new(AgentState::new()));
+        let start = Instant::now();
+        parallel.execute(state.clone()).await.unwrap();
+        let elapsed = start.elapsed();
+
+        assert!(elapsed < Duration::from_millis(900));
+        let guard = state.read().unwrap();
+        assert!(guard.context.contains_key("fast"));
+        assert!(guard.context.contains_key("medium"));
+        assert!(!guard.context.contains_key("slow"));
+    }
+
+    #[tokio::test]
+    async fn test_parallel_wait_n_fail_fast_on_error() {
+        let parallel = ParallelSubgraphs::new("parallel")
+            .add_subgraph("ok", create_delayed_graph("ok", "ok", "v", 10))
+            .add_subgraph("fail", GraphBuilder::new()
+                .add_node(crate::nodes::function::FunctionNode::new("fail", |_| async {
+                    Err(NodeError::execution_failed("intentional failure"))
+                }))
+                .set_entry_point("fail")
+                .compile()
+                .unwrap())
+            .add_subgraph("slow", create_delayed_graph("slow", "slow", "v", 1000))
+            .with_join_strategy(JoinStrategy::WaitN(2));
+
+        let state = Arc::new(RwLock::new(AgentState::new()));
+        let start = Instant::now();
+        let result = parallel.execute(state).await;
+        let elapsed = start.elapsed();
+
+        assert!(result.is_err());
         assert!(elapsed < Duration::from_millis(900));
     }
 }

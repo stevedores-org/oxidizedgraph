@@ -499,6 +499,27 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_tool_node_explicit_policy_deny() {
+        use crate::tools::policy::{ToolExecutionPolicy, ToolPolicyEngine};
+
+        let tool = FunctionTool::new("rm", "remove", serde_json::json!({}), |_| Ok("ok".into()));
+        let registry = ToolRegistry::new().register(tool);
+        let policy = ToolPolicyEngine::new(ToolExecutionPolicy::permissive().deny_tool("rm"));
+        let config = ToolNodeConfig::default().with_policy(policy);
+        let node = ToolNode::with_config("tools", registry, config);
+
+        let mut state = AgentState::new();
+        state
+            .tool_calls
+            .push(ToolCall::new("1", "rm", serde_json::json!({})));
+
+        let shared = Arc::new(RwLock::new(state));
+        node.execute(shared.clone()).await.unwrap();
+        let guard = shared.read().unwrap();
+        assert!(guard.messages[0].content.contains("denied by policy"));
+    }
+
+    #[tokio::test]
     async fn test_tool_node_policy_denial() {
         use crate::tools::policy::{ToolExecutionPolicy, ToolPolicyEngine};
 

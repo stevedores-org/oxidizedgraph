@@ -26,6 +26,7 @@ pub enum ValidationError {
 #[derive(Clone, Debug, Default)]
 pub struct StateValidator {
     required_keys: Vec<String>,
+    typed_keys: Vec<(String, &'static str)>,
 }
 
 impl StateValidator {
@@ -40,6 +41,12 @@ impl StateValidator {
         self
     }
 
+    /// Require a context key to be present with a JSON type (`string`, `number`, etc.).
+    pub fn require_context_type(mut self, key: impl Into<String>, expected_type: &'static str) -> Self {
+        self.typed_keys.push((key.into(), expected_type));
+        self
+    }
+
     /// Validate state against required keys and optional schema checks.
     pub fn validate(&self, state: &AgentState) -> Result<(), ValidationError> {
         for key in &self.required_keys {
@@ -48,14 +55,24 @@ impl StateValidator {
             }
         }
 
-        // Ensure state conforms to AgentState schema shape when non-empty
+        for (key, expected_type) in &self.typed_keys {
+            let Some(value) = state.context.get(key) else {
+                return Err(ValidationError::MissingKey(key.clone()));
+            };
+            validate_json_type(value, expected_type).map_err(|e| match e {
+                ValidationError::InvalidValue { reason, .. } => ValidationError::InvalidValue {
+                    key: key.clone(),
+                    reason,
+                },
+                other => other,
+            })?;
+        }
+
+        // Validate top-level AgentState fields declared in the JSON schema.
         let schema = AgentState::schema();
         if let Some(required) = schema.get("required").and_then(|v| v.as_array()) {
             for item in required {
                 if let Some(prop) = item.as_str() {
-                    if prop == "context" {
-                        continue;
-                    }
                     if !state_has_property(state, prop) {
                         return Err(ValidationError::MissingKey(prop.to_string()));
                     }
@@ -79,7 +96,6 @@ fn state_has_property(state: &AgentState, prop: &str) -> bool {
 }
 
 /// Validate a JSON value against a simple type constraint.
-#[allow(dead_code)]
 pub fn validate_json_type(value: &Value, expected_type: &str) -> Result<(), ValidationError> {
     let ok = match expected_type {
         "string" => value.is_string(),
@@ -113,6 +129,28 @@ mod tests {
         ));
 
         let mut state = AgentState::new();
+        state.set_context("gate_passed", true);
+        assert!(validator.validate(&state).is_ok());
+    }
+
+    #[test]
+    fn test_schema_required_fields() {
+        let validator = StateValidator::new();
+        assert!(validator.validate(&AgentState::new()).is_ok());
+    }
+
+    #[test]
+    fn test_context_type_validation() {
+        let validator =
+            StateValidator::new().require_context_type("gate_passed", "boolean");
+
+        let mut state = AgentState::new();
+        state.set_context("gate_passed", "not-a-bool");
+        assert!(matches!(
+            validator.validate(&state),
+            Err(ValidationError::InvalidValue { .. })
+        ));
+
         state.set_context("gate_passed", true);
         assert!(validator.validate(&state).is_ok());
     }

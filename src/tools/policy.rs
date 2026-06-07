@@ -114,11 +114,7 @@ impl ToolPolicyEngine {
     /// Evaluate whether a tool may run.
     pub fn evaluate(&self, tool_name: &str, command_hint: Option<&str>) -> Result<PolicyDecision, PolicyViolation> {
         if self.policy.denied_tools.contains(tool_name) {
-            return Err(PolicyViolation {
-                tool_name: tool_name.to_string(),
-                reason: "tool is explicitly denied".to_string(),
-                capability: None,
-            });
+            return Ok(PolicyDecision::Deny);
         }
 
         if self.policy.approval_required.contains(tool_name) {
@@ -153,6 +149,13 @@ impl ToolPolicyEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_explicit_deny_tool() {
+        let policy = ToolExecutionPolicy::permissive().deny_tool("rm");
+        let engine = ToolPolicyEngine::new(policy);
+        assert_eq!(engine.evaluate("rm", None).unwrap(), PolicyDecision::Deny);
+    }
 
     #[test]
     fn test_deny_unknown_tool() {
