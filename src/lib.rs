@@ -46,6 +46,7 @@ pub mod error;
 pub mod events;
 pub mod execution;
 pub mod git;
+pub mod governance;
 pub mod graph;
 pub mod guardrails;
 pub mod nodes;
