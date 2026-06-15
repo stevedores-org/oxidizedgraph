@@ -72,6 +72,15 @@ pub use crate::planning::{
     EpicPlan, PlanProgress, PlanningNode, Scheduler, SchedulerNode, Task, TaskStatus,
 };
 
+// Human-in-the-loop controls (roadmap EPIC8)
+pub use crate::hitl::{
+    append_approval_event, ApprovalAction, ApprovalCheckpointNode, ApprovalDecision,
+    ApprovalEvent, ApprovalMatrix, ApprovalPolicy, ApprovalRequest, ApprovalStatus,
+    ApproverRole, ExplanationPayload, GrantApprovalNode, ResumeNode, RunTimeline,
+    TimelineEntry, CTX_APPROVAL_DECISION, CTX_APPROVAL_EVENTS, CTX_APPROVAL_REQUEST,
+    CTX_EXPLANATION, CTX_HITL_PAUSED,
+};
+
 // Built-in nodes
 pub use crate::nodes::tool::{AsyncFunctionTool, FunctionTool};
 pub use crate::nodes::{
