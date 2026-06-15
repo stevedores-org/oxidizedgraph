@@ -51,6 +51,7 @@ pub mod governance;
 pub mod graph;
 pub mod guardrails;
 pub mod hitl;
+pub mod memory;
 pub mod nodes;
 pub mod orchestration;
 pub mod planning;
