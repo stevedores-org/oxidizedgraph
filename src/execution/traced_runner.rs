@@ -28,7 +28,7 @@ use super::transition::TransitionLog;
 
 /// Graph runner with transition logging and optional state validation.
 pub struct TracedRunner {
-    graph: CompiledGraph,
+    graph: Arc<CompiledGraph>,
     config: RunnerConfig,
     run_context: RunContext,
     transition_log: SharedTransitionLog,
@@ -42,9 +42,13 @@ impl TracedRunner {
     }
 
     /// Create a traced runner with explicit run context and config.
-    pub fn with_context(graph: CompiledGraph, run_context: RunContext, config: RunnerConfig) -> Self {
+    pub fn with_context(
+        graph: impl Into<Arc<CompiledGraph>>,
+        run_context: RunContext,
+        config: RunnerConfig,
+    ) -> Self {
         Self {
-            graph,
+            graph: graph.into(),
             config,
             run_context,
             transition_log: shared_transition_log(),
