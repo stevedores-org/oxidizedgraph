@@ -51,6 +51,7 @@ pub mod graph;
 pub mod guardrails;
 pub mod nodes;
 pub mod orchestration;
+pub mod planning;
 pub mod runner;
 pub mod state;
 pub mod tools;
