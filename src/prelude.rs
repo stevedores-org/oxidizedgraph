@@ -70,8 +70,9 @@ pub use crate::governance::{
     agent_role_from_state, apply_role_guidance, compose_guidance, load_manifest,
     role_system_prompt, tool_policy_for_role, tool_policy_for_state, AgentRole, GovernanceConfig,
     GovernanceError, GovernanceNode, RoleGuidance, RoleHandoffNode, RoleRouterNode,
-    RoleTargetRouterNode, CTX_AGENT_ROLE, CTX_GOVERNANCE_GUIDANCE, CTX_ROLE_SYSTEM_PROMPT,
-    CTX_TOOL_POLICY_ROLE,
+    RoleTargetRouterNode, SymlinkManager, SymlinkStatus, GovernanceValidator,
+    ManifestError, ValidationError, CTX_AGENT_ROLE, CTX_GOVERNANCE_GUIDANCE,
+    CTX_ROLE_SYSTEM_PROMPT, CTX_TOOL_POLICY_ROLE,
 };
 
 // Planning and autonomy (roadmap EPIC6/EPIC7)
@@ -113,8 +114,8 @@ pub use crate::enterprise::{
 // Built-in nodes
 pub use crate::nodes::tool::{AsyncFunctionTool, FunctionTool};
 pub use crate::nodes::{
-    ConditionalNode, ContextRouterNode, DelayNode, EchoNode, FunctionNode, LLMConfig, LLMNode,
-    LLMProvider, StaticTransitionNode, Tool, ToolNode, ToolNodeConfig, ToolRegistry,
+    BranchNode, ConditionalNode, ContextRouterNode, DelayNode, EchoNode, FunctionNode, LLMConfig,
+    LLMNode, LLMProvider, StaticTransitionNode, Tool, ToolNode, ToolNodeConfig, ToolRegistry,
 };
 
 // Re-exports from dependencies
