@@ -37,10 +37,13 @@ axum = "0.7"
 
 # Persistence layer (optional)
 surrealdb = { version = "2", optional = true, features = ["kv-mem"] }
+pathdiff = "0.2.3"
+clap = { version = "4.6.1", features = ["derive"] }
 
 [dev-dependencies]
 tokio-test = "0.4"
 mockall = "0.13"
+tempfile = "3.27.0"
 
 [[example]]
 name = "simple_workflow"

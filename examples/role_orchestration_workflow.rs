@@ -35,7 +35,10 @@ impl NodeExecutor for PlanNode {
         let mut guard = state
             .write()
             .map_err(|e| NodeError::execution_failed(e.to_string()))?;
-        guard.set_context("design_note", "Add GovernanceNode + role routing primitives");
+        guard.set_context(
+            "design_note",
+            "Add GovernanceNode + role routing primitives",
+        );
         Ok(NodeOutput::cont())
     }
 }
@@ -70,13 +73,27 @@ async fn main() -> anyhow::Result<()> {
             AgentRole::Architect,
         ))
         .add_node(PlanNode)
-        .add_node(RoleHandoffNode::new("handoff_builder", MANIFEST, AgentRole::Builder))
+        .add_node(RoleHandoffNode::new(
+            "handoff_builder",
+            MANIFEST,
+            AgentRole::Builder,
+        ))
         .add_node(BuildNode)
-        .add_node(RoleHandoffNode::new("handoff_auditor", MANIFEST, AgentRole::Auditor))
+        .add_node(RoleHandoffNode::new(
+            "handoff_auditor",
+            MANIFEST,
+            AgentRole::Auditor,
+        ))
         .add_node(RoleRouterNode::new("role_route", "default"))
-        .add_node(EchoNode::new("audit_lane", "Auditor lane: policy checks complete"))
+        .add_node(EchoNode::new(
+            "audit_lane",
+            "Auditor lane: policy checks complete",
+        ))
         .add_node(EchoNode::new("fallback", "No role set — unexpected"))
-        .add_node(EchoNode::new("done", "Role orchestration workflow complete"))
+        .add_node(EchoNode::new(
+            "done",
+            "Role orchestration workflow complete",
+        ))
         .set_entry_point("gov_architect")
         .add_edge("gov_architect", "plan")
         .add_edge("plan", "handoff_builder")

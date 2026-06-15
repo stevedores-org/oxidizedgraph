@@ -14,9 +14,10 @@ async fn main() -> anyhow::Result<()> {
         .name("hitl_workflow")
         .add_node(ApprovalCheckpointNode::new("checkpoint"))
         .add_node(EditInterventionNode::new("apply_edits"))
-        .add_node(GrantApprovalNode::new("grant", "operator@example.com").with_rationale(
-            "Reviewed risk summary — proceed with deploy",
-        ))
+        .add_node(
+            GrantApprovalNode::new("grant", "operator@example.com")
+                .with_rationale("Reviewed risk summary — proceed with deploy"),
+        )
         .add_node(EchoNode::new("ship", "Change shipped after approval"))
         .add_node(EchoNode::new("wait", "Paused for operator review"))
         .set_entry_point("checkpoint")
@@ -78,7 +79,10 @@ async fn main() -> anyhow::Result<()> {
     let state = shared.read().unwrap().clone();
     let result = traced.invoke(state).await?;
 
-    if let Some(explanation) = result.state.get_context::<ExplanationPayload>(CTX_EXPLANATION) {
+    if let Some(explanation) = result
+        .state
+        .get_context::<ExplanationPayload>(CTX_EXPLANATION)
+    {
         println!("Summary: {}", explanation.summary);
         println!("Rationale: {}", explanation.rationale);
         if let Some(diff) = &explanation.diff_hint {
@@ -90,7 +94,10 @@ async fn main() -> anyhow::Result<()> {
         println!("Final summary after edit: {summary}");
     }
 
-    if let Some(events) = result.state.get_context::<Vec<ApprovalEvent>>(CTX_APPROVAL_EVENTS) {
+    if let Some(events) = result
+        .state
+        .get_context::<Vec<ApprovalEvent>>(CTX_APPROVAL_EVENTS)
+    {
         println!("Approval events: {}", events.len());
         for event in &events {
             println!("  [{}] {}", event.timestamp, event.kind);

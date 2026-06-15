@@ -186,14 +186,8 @@ impl ParallelSubgraphs {
             let handle = tokio::spawn(async move {
                 let runner = GraphRunner::new((*graph).clone(), config);
                 match runner.invoke(child_state).await {
-                    Ok(state) => SubgraphResult::Completed {
-                        subgraph_id,
-                        state,
-                    },
-                    Err(error) => SubgraphResult::Failed {
-                        subgraph_id,
-                        error,
-                    },
+                    Ok(state) => SubgraphResult::Completed { subgraph_id, state },
+                    Err(error) => SubgraphResult::Failed { subgraph_id, error },
                 }
             });
 
@@ -336,11 +330,8 @@ impl NodeExecutor for ParallelSubgraphs {
         );
 
         // Create a map of subgraph configs by ID for merger lookup
-        let config_map: HashMap<&str, &SubgraphConfig> = self
-            .subgraphs
-            .iter()
-            .map(|c| (c.id.as_str(), c))
-            .collect();
+        let config_map: HashMap<&str, &SubgraphConfig> =
+            self.subgraphs.iter().map(|c| (c.id.as_str(), c)).collect();
 
         // Merge results back into parent state
         {
@@ -349,7 +340,10 @@ impl NodeExecutor for ParallelSubgraphs {
                 .map_err(|e| NodeError::execution_failed(e.to_string()))?;
 
             for (id, result) in results {
-                if let SubgraphResult::Completed { state: child_state, .. } = result {
+                if let SubgraphResult::Completed {
+                    state: child_state, ..
+                } = result
+                {
                     if let Some(config) = config_map.get(id.as_str()) {
                         (config.result_merger)(&mut guard, child_state);
                     }
@@ -416,8 +410,14 @@ mod tests {
     #[tokio::test]
     async fn test_parallel_subgraphs_wait_all() {
         let parallel = ParallelSubgraphs::new("parallel")
-            .add_subgraph("fast", create_delayed_graph("fast", "fast_result", "fast_value", 10))
-            .add_subgraph("slow", create_delayed_graph("slow", "slow_result", "slow_value", 50))
+            .add_subgraph(
+                "fast",
+                create_delayed_graph("fast", "fast_result", "fast_value", 10),
+            )
+            .add_subgraph(
+                "slow",
+                create_delayed_graph("slow", "slow_result", "slow_value", 50),
+            )
             .with_join_strategy(JoinStrategy::WaitAll);
 
         let state = Arc::new(RwLock::new(AgentState::new()));
@@ -445,13 +445,17 @@ mod tests {
     async fn test_parallel_fail_fast() {
         let parallel = ParallelSubgraphs::new("parallel")
             .add_subgraph("slow", create_delayed_graph("slow", "s", "v", 1000))
-            .add_subgraph("fast_fail", GraphBuilder::new()
-                .add_node(crate::nodes::function::FunctionNode::new("fail", |_| async {
-                    Err(NodeError::execution_failed("intentional failure"))
-                }))
-                .set_entry_point("fail")
-                .compile()
-                .unwrap())
+            .add_subgraph(
+                "fast_fail",
+                GraphBuilder::new()
+                    .add_node(crate::nodes::function::FunctionNode::new(
+                        "fail",
+                        |_| async { Err(NodeError::execution_failed("intentional failure")) },
+                    ))
+                    .set_entry_point("fail")
+                    .compile()
+                    .unwrap(),
+            )
             .with_join_strategy(JoinStrategy::FailFast);
 
         let state = Arc::new(RwLock::new(AgentState::new()));
@@ -468,13 +472,17 @@ mod tests {
     async fn test_parallel_wait_all_propagates_failure() {
         let parallel = ParallelSubgraphs::new("parallel")
             .add_subgraph("ok", create_delayed_graph("ok", "k", "v", 10))
-            .add_subgraph("fail", GraphBuilder::new()
-                .add_node(crate::nodes::function::FunctionNode::new("fail", |_| async {
-                    Err(NodeError::execution_failed("intentional failure"))
-                }))
-                .set_entry_point("fail")
-                .compile()
-                .unwrap())
+            .add_subgraph(
+                "fail",
+                GraphBuilder::new()
+                    .add_node(crate::nodes::function::FunctionNode::new(
+                        "fail",
+                        |_| async { Err(NodeError::execution_failed("intentional failure")) },
+                    ))
+                    .set_entry_point("fail")
+                    .compile()
+                    .unwrap(),
+            )
             .with_join_strategy(JoinStrategy::WaitAll);
 
         let state = Arc::new(RwLock::new(AgentState::new()));
@@ -522,13 +530,17 @@ mod tests {
     async fn test_parallel_wait_n_fail_fast_on_error() {
         let parallel = ParallelSubgraphs::new("parallel")
             .add_subgraph("ok", create_delayed_graph("ok", "ok", "v", 10))
-            .add_subgraph("fail", GraphBuilder::new()
-                .add_node(crate::nodes::function::FunctionNode::new("fail", |_| async {
-                    Err(NodeError::execution_failed("intentional failure"))
-                }))
-                .set_entry_point("fail")
-                .compile()
-                .unwrap())
+            .add_subgraph(
+                "fail",
+                GraphBuilder::new()
+                    .add_node(crate::nodes::function::FunctionNode::new(
+                        "fail",
+                        |_| async { Err(NodeError::execution_failed("intentional failure")) },
+                    ))
+                    .set_entry_point("fail")
+                    .compile()
+                    .unwrap(),
+            )
             .add_subgraph("slow", create_delayed_graph("slow", "slow", "v", 1000))
             .with_join_strategy(JoinStrategy::WaitN(2));
 

@@ -117,12 +117,20 @@ async fn epic2_graph_walks_architect_to_auditor() {
             id: "plan",
             key: "planned",
         })
-        .add_node(RoleHandoffNode::new("to_builder", MANIFEST, AgentRole::Builder))
+        .add_node(RoleHandoffNode::new(
+            "to_builder",
+            MANIFEST,
+            AgentRole::Builder,
+        ))
         .add_node(MarkNode {
             id: "build",
             key: "built",
         })
-        .add_node(RoleHandoffNode::new("to_auditor", MANIFEST, AgentRole::Auditor))
+        .add_node(RoleHandoffNode::new(
+            "to_auditor",
+            MANIFEST,
+            AgentRole::Auditor,
+        ))
         .add_node(RoleRouterNode::new("route", "default"))
         .add_node(MarkNode {
             id: "audit",
@@ -144,8 +152,5 @@ async fn epic2_graph_walks_architect_to_auditor() {
     assert!(result.get_context::<bool>("planned").unwrap());
     assert!(result.get_context::<bool>("built").unwrap());
     assert!(result.get_context::<bool>("audited").unwrap());
-    assert_eq!(
-        agent_role_from_state(&result),
-        Some(AgentRole::Auditor)
-    );
+    assert_eq!(agent_role_from_state(&result), Some(AgentRole::Auditor));
 }

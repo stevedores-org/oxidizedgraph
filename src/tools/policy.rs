@@ -112,7 +112,11 @@ impl ToolPolicyEngine {
     }
 
     /// Evaluate whether a tool may run.
-    pub fn evaluate(&self, tool_name: &str, command_hint: Option<&str>) -> Result<PolicyDecision, PolicyViolation> {
+    pub fn evaluate(
+        &self,
+        tool_name: &str,
+        command_hint: Option<&str>,
+    ) -> Result<PolicyDecision, PolicyViolation> {
         if self.policy.denied_tools.contains(tool_name) {
             return Ok(PolicyDecision::Deny);
         }

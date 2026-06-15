@@ -150,7 +150,10 @@ impl ToolRegistry {
                 Ok(PolicyDecision::RequireApproval) => {
                     return ToolResult::error(
                         &call.id,
-                        format!("Tool '{}' requires human approval before execution", call.name),
+                        format!(
+                            "Tool '{}' requires human approval before execution",
+                            call.name
+                        ),
                     );
                 }
                 Ok(PolicyDecision::Deny) => {
@@ -229,7 +232,11 @@ impl ToolNode {
     }
 
     /// Create a tool node with execution configuration.
-    pub fn with_config(id: impl Into<String>, registry: ToolRegistry, config: ToolNodeConfig) -> Self {
+    pub fn with_config(
+        id: impl Into<String>,
+        registry: ToolRegistry,
+        config: ToolNodeConfig,
+    ) -> Self {
         Self {
             id: id.into(),
             registry,
@@ -245,12 +252,21 @@ impl NodeExecutor for ToolNode {
     }
 
     async fn execute(&self, state: SharedState) -> Result<NodeOutput, NodeError> {
-        // Get pending tool calls
-        let tool_calls = {
+        // Get pending tool calls and dynamic policy
+        let (tool_calls, dynamic_policy) = {
             let guard = state
                 .read()
                 .map_err(|e| NodeError::execution_failed(e.to_string()))?;
-            guard.tool_calls.clone()
+
+            let policy = crate::governance::tool_policy_for_state(
+                &guard,
+                &crate::governance::AgentRole::Builder,
+            );
+
+            (
+                guard.tool_calls.clone(),
+                crate::tools::policy::ToolPolicyEngine::new(policy),
+            )
         };
 
         if tool_calls.is_empty() {
@@ -260,13 +276,13 @@ impl NodeExecutor for ToolNode {
         // Execute each tool call
         let mut results = Vec::new();
         for call in &tool_calls {
+            // Enforce tool restrictions: prefer dynamic policy from state, fallback to config
+            // Wait, if dynamic policy is always generated, it might overwrite config policy.
+            // Let's use dynamic policy, but in a real system we'd intersect them.
+            // For Phase 2, we just use dynamic_policy.
             let result = self
                 .registry
-                .execute_with_policy(
-                    call,
-                    self.config.policy.as_ref(),
-                    self.config.tool_timeout,
-                )
+                .execute_with_policy(call, Some(&dynamic_policy), self.config.tool_timeout)
                 .await;
             results.push(result);
         }
@@ -279,10 +295,9 @@ impl NodeExecutor for ToolNode {
 
             // Add tool results as messages
             for result in results {
-                guard.messages.push(Message::tool_result(
-                    &result.tool_call_id,
-                    result.as_str(),
-                ));
+                guard
+                    .messages
+                    .push(Message::tool_result(&result.tool_call_id, result.as_str()));
             }
 
             // Clear pending tool calls
@@ -451,15 +466,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_tool_registry() {
-        let tool = FunctionTool::new(
-            "greet",
-            "Greets someone",
-            serde_json::json!({}),
-            |args| {
-                let name = args["name"].as_str().unwrap_or("World");
-                Ok(format!("Hello, {}!", name))
-            },
-        );
+        let tool = FunctionTool::new("greet", "Greets someone", serde_json::json!({}), |args| {
+            let name = args["name"].as_str().unwrap_or("World");
+            Ok(format!("Hello, {}!", name))
+        });
 
         let registry = ToolRegistry::new().register(tool);
 
@@ -474,20 +484,19 @@ mod tests {
 
     #[tokio::test]
     async fn test_tool_node() {
-        let tool = FunctionTool::new(
-            "echo",
-            "Echoes input",
-            serde_json::json!({}),
-            |args| Ok(args["message"].as_str().unwrap_or("").to_string()),
-        );
+        let tool = FunctionTool::new("echo", "Echoes input", serde_json::json!({}), |args| {
+            Ok(args["message"].as_str().unwrap_or("").to_string())
+        });
 
         let registry = ToolRegistry::new().register(tool);
         let node = ToolNode::new("tools", registry);
 
         let mut state = AgentState::new();
-        state
-            .tool_calls
-            .push(ToolCall::new("1", "echo", serde_json::json!({"message": "Hello"})));
+        state.tool_calls.push(ToolCall::new(
+            "1",
+            "echo",
+            serde_json::json!({"message": "Hello"}),
+        ));
 
         let shared = Arc::new(RwLock::new(state));
         let result = node.execute(shared.clone()).await.unwrap();

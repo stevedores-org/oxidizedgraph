@@ -6,11 +6,7 @@ use oxidizedgraph::prelude::*;
 fn tenant_boundary_blocks_cross_tenant_operator() {
     let guard = TenantGuard::new();
     let policy = RbacPolicy::enterprise_default();
-    let subject = RbacSubject::new(
-        "bob",
-        TenantId::new("tenant-a"),
-        vec![RbacRole::Operator],
-    );
+    let subject = RbacSubject::new("bob", TenantId::new("tenant-a"), vec![RbacRole::Operator]);
     let result = guard.check_access(
         &subject,
         &TenantId::new("tenant-b"),
@@ -89,8 +85,5 @@ async fn tenant_guard_node_denies_cross_tenant() {
     let runner = GraphRunner::with_defaults(graph);
     let result = runner.invoke(state).await.unwrap();
     let audit: AuditLog = result.get_context(CTX_AUDIT_LOG).unwrap();
-    assert!(audit
-        .records()
-        .iter()
-        .any(|r| r.outcome == "denied"));
+    assert!(audit.records().iter().any(|r| r.outcome == "denied"));
 }

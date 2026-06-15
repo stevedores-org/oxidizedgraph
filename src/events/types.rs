@@ -67,19 +67,33 @@ impl Event {
     }
 
     /// Create a graph started event
-    pub fn graph_started(thread_id: impl Into<String>, graph_name: Option<String>, entry_point: String) -> Self {
-        Self::new(thread_id, EventKind::Graph(GraphEvent::Started {
-            graph_name,
-            entry_point,
-        }))
+    pub fn graph_started(
+        thread_id: impl Into<String>,
+        graph_name: Option<String>,
+        entry_point: String,
+    ) -> Self {
+        Self::new(
+            thread_id,
+            EventKind::Graph(GraphEvent::Started {
+                graph_name,
+                entry_point,
+            }),
+        )
     }
 
     /// Create a graph completed event
-    pub fn graph_completed(thread_id: impl Into<String>, iterations: u32, duration: Duration) -> Self {
-        Self::new(thread_id, EventKind::Graph(GraphEvent::Completed {
-            iterations,
-            duration_ms: duration.as_millis() as u64,
-        }))
+    pub fn graph_completed(
+        thread_id: impl Into<String>,
+        iterations: u32,
+        duration: Duration,
+    ) -> Self {
+        Self::new(
+            thread_id,
+            EventKind::Graph(GraphEvent::Completed {
+                iterations,
+                duration_ms: duration.as_millis() as u64,
+            }),
+        )
     }
 
     /// Create a graph error event
@@ -89,10 +103,10 @@ impl Event {
 
     /// Create a node entered event
     pub fn node_entered(thread_id: impl Into<String>, node_id: String, iteration: u32) -> Self {
-        Self::new(thread_id, EventKind::Node(NodeEvent::Entered {
-            node_id,
-            iteration,
-        }))
+        Self::new(
+            thread_id,
+            EventKind::Node(NodeEvent::Entered { node_id, iteration }),
+        )
     }
 
     /// Create a node exited event
@@ -102,16 +116,22 @@ impl Event {
         next_node: Option<String>,
         duration: Duration,
     ) -> Self {
-        Self::new(thread_id, EventKind::Node(NodeEvent::Exited {
-            node_id,
-            next_node,
-            duration_ms: duration.as_millis() as u64,
-        }))
+        Self::new(
+            thread_id,
+            EventKind::Node(NodeEvent::Exited {
+                node_id,
+                next_node,
+                duration_ms: duration.as_millis() as u64,
+            }),
+        )
     }
 
     /// Create a node error event
     pub fn node_error(thread_id: impl Into<String>, node_id: String, error: String) -> Self {
-        Self::new(thread_id, EventKind::Node(NodeEvent::Error { node_id, error }))
+        Self::new(
+            thread_id,
+            EventKind::Node(NodeEvent::Error { node_id, error }),
+        )
     }
 
     /// Create a checkpoint saved event
@@ -120,10 +140,13 @@ impl Event {
         checkpoint_id: String,
         node_id: String,
     ) -> Self {
-        Self::new(thread_id, EventKind::Checkpoint(CheckpointEvent::Saved {
-            checkpoint_id,
-            node_id,
-        }))
+        Self::new(
+            thread_id,
+            EventKind::Checkpoint(CheckpointEvent::Saved {
+                checkpoint_id,
+                node_id,
+            }),
+        )
     }
 
     /// Create a checkpoint restored event
@@ -132,10 +155,13 @@ impl Event {
         checkpoint_id: String,
         node_id: String,
     ) -> Self {
-        Self::new(thread_id, EventKind::Checkpoint(CheckpointEvent::Restored {
-            checkpoint_id,
-            node_id,
-        }))
+        Self::new(
+            thread_id,
+            EventKind::Checkpoint(CheckpointEvent::Restored {
+                checkpoint_id,
+                node_id,
+            }),
+        )
     }
 
     /// Create a state updated event
@@ -144,10 +170,13 @@ impl Event {
         node_id: String,
         keys_changed: Vec<String>,
     ) -> Self {
-        Self::new(thread_id, EventKind::State(StateEvent::Updated {
-            node_id,
-            keys_changed,
-        }))
+        Self::new(
+            thread_id,
+            EventKind::State(StateEvent::Updated {
+                node_id,
+                keys_changed,
+            }),
+        )
     }
 
     /// Check if this is a graph event
@@ -321,7 +350,11 @@ mod tests {
 
     #[test]
     fn test_event_creation() {
-        let event = Event::graph_started("thread-1", Some("my_graph".to_string()), "start".to_string());
+        let event = Event::graph_started(
+            "thread-1",
+            Some("my_graph".to_string()),
+            "start".to_string(),
+        );
 
         assert_eq!(event.thread_id, "thread-1");
         assert!(event.is_graph_event());

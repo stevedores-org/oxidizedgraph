@@ -118,13 +118,14 @@ async fn main() -> anyhow::Result<()> {
     let coordinator_graph = GraphBuilder::new()
         .name("coordinator")
         .add_node(
-            SubgraphNode::new("ai_research", research_subgraph)
-                .with_result_merger(|parent, child| {
+            SubgraphNode::new("ai_research", research_subgraph).with_result_merger(
+                |parent, child| {
                     // Copy findings to parent with prefix
                     if let Some(findings) = child.get_context::<String>("findings") {
                         parent.set_context("ai_findings", findings);
                     }
-                }),
+                },
+            ),
         )
         .add_node(SynthesizerNode)
         .set_entry_point("ai_research")
@@ -213,9 +214,21 @@ async fn main() -> anyhow::Result<()> {
 
     let results = spawner
         .builder()
-        .spawn("ml", create_researcher_graph("machine_learning", 25), AgentState::new())
-        .spawn("db", create_researcher_graph("databases", 35), AgentState::new())
-        .spawn("net", create_researcher_graph("networking", 20), AgentState::new())
+        .spawn(
+            "ml",
+            create_researcher_graph("machine_learning", 25),
+            AgentState::new(),
+        )
+        .spawn(
+            "db",
+            create_researcher_graph("databases", 35),
+            AgentState::new(),
+        )
+        .spawn(
+            "net",
+            create_researcher_graph("networking", 20),
+            AgentState::new(),
+        )
         .join_all()
         .await;
 

@@ -6,8 +6,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, RwLock};
 use tracing::{debug, error, info, warn};
 
-use super::types::{Event, EventKind, GraphEvent, NodeEvent, CheckpointEvent};
 use super::bus::EventReceiver;
+use super::types::{CheckpointEvent, Event, EventKind, GraphEvent, NodeEvent};
 
 /// Trait for handling events
 #[async_trait]
@@ -48,7 +48,10 @@ impl EventHandler for LoggingHandler {
     async fn handle(&self, event: &Event) {
         match &event.kind {
             EventKind::Graph(graph_event) => match graph_event {
-                GraphEvent::Started { graph_name, entry_point } => {
+                GraphEvent::Started {
+                    graph_name,
+                    entry_point,
+                } => {
                     info!(
                         thread_id = %event.thread_id,
                         graph_name = ?graph_name,
@@ -56,7 +59,10 @@ impl EventHandler for LoggingHandler {
                         "Graph execution started"
                     );
                 }
-                GraphEvent::Completed { iterations, duration_ms } => {
+                GraphEvent::Completed {
+                    iterations,
+                    duration_ms,
+                } => {
                     info!(
                         thread_id = %event.thread_id,
                         iterations = iterations,
@@ -89,7 +95,11 @@ impl EventHandler for LoggingHandler {
                         "Entering node"
                     );
                 }
-                NodeEvent::Exited { node_id, next_node, duration_ms } => {
+                NodeEvent::Exited {
+                    node_id,
+                    next_node,
+                    duration_ms,
+                } => {
                     debug!(
                         thread_id = %event.thread_id,
                         node_id = %node_id,
@@ -106,7 +116,11 @@ impl EventHandler for LoggingHandler {
                         "Node execution failed"
                     );
                 }
-                NodeEvent::Retrying { node_id, attempt, delay_ms } => {
+                NodeEvent::Retrying {
+                    node_id,
+                    attempt,
+                    delay_ms,
+                } => {
                     warn!(
                         thread_id = %event.thread_id,
                         node_id = %node_id,
@@ -117,7 +131,10 @@ impl EventHandler for LoggingHandler {
                 }
             },
             EventKind::Checkpoint(checkpoint_event) => match checkpoint_event {
-                CheckpointEvent::Saved { checkpoint_id, node_id } => {
+                CheckpointEvent::Saved {
+                    checkpoint_id,
+                    node_id,
+                } => {
                     debug!(
                         thread_id = %event.thread_id,
                         checkpoint_id = %checkpoint_id,
@@ -125,7 +142,10 @@ impl EventHandler for LoggingHandler {
                         "Checkpoint saved"
                     );
                 }
-                CheckpointEvent::Restored { checkpoint_id, node_id } => {
+                CheckpointEvent::Restored {
+                    checkpoint_id,
+                    node_id,
+                } => {
                     info!(
                         thread_id = %event.thread_id,
                         checkpoint_id = %checkpoint_id,
@@ -294,7 +314,11 @@ impl EventHandler for MetricsHandler {
             EventKind::Graph(GraphEvent::Error { .. }) => {
                 self.graphs_errored.fetch_add(1, Ordering::Relaxed);
             }
-            EventKind::Node(NodeEvent::Exited { node_id, duration_ms, .. }) => {
+            EventKind::Node(NodeEvent::Exited {
+                node_id,
+                duration_ms,
+                ..
+            }) => {
                 if let Ok(mut m) = self.node_executions.write() {
                     *m.entry(node_id.clone()).or_insert(0) += 1;
                 }

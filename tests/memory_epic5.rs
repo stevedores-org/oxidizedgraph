@@ -65,11 +65,7 @@ fn epic5_decision_memory_is_queryable() {
 fn epic5_context_packer_respects_token_budget() {
     let mut index = RepositoryIndex::new();
     let content = "retrieval ".repeat(200);
-    index.index_document(RepositoryDocument::source(
-        REPO,
-        "src/memory.rs",
-        content,
-    ));
+    index.index_document(RepositoryDocument::source(REPO, "src/memory.rs", content));
 
     let hits = index.query(&RetrievalQuery::new("retrieval").limit(1));
     let packer = ContextPacker::new(100);
