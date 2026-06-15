@@ -58,10 +58,7 @@ impl MockLLM {
                     vec![],
                 )
             }
-            _ => (
-                "How can I help you today?".to_string(),
-                vec![],
-            ),
+            _ => ("How can I help you today?".to_string(), vec![]),
         }
     }
 }
@@ -97,9 +94,7 @@ impl Tool for WeatherTool {
     }
 
     async fn execute(&self, arguments: serde_json::Value) -> Result<String, NodeError> {
-        let location = arguments["location"]
-            .as_str()
-            .unwrap_or("Unknown");
+        let location = arguments["location"].as_str().unwrap_or("Unknown");
         Ok(format!("Weather in {}: Sunny, 72°F", location))
     }
 }
@@ -131,9 +126,7 @@ impl Tool for CalculatorTool {
     }
 
     async fn execute(&self, arguments: serde_json::Value) -> Result<String, NodeError> {
-        let expr = arguments["expression"]
-            .as_str()
-            .unwrap_or("0");
+        let expr = arguments["expression"].as_str().unwrap_or("0");
         // Simple mock calculation
         if expr.contains("42 * 17") {
             Ok("714".to_string())
@@ -263,9 +256,9 @@ async fn main() -> anyhow::Result<()> {
     initial_state.messages.push(Message::system(
         "You are a helpful assistant with access to weather and calculator tools.",
     ));
-    initial_state.messages.push(Message::user(
-        "What's the weather like in San Francisco?",
-    ));
+    initial_state
+        .messages
+        .push(Message::user("What's the weather like in San Francisco?"));
 
     println!("User: What's the weather like in San Francisco?\n");
     println!("---\n");

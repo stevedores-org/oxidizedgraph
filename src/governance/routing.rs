@@ -66,11 +66,7 @@ pub struct RoleHandoffNode {
 
 impl RoleHandoffNode {
     /// Create a handoff node with an inline manifest.
-    pub fn new(
-        id: impl Into<String>,
-        manifest: impl Into<String>,
-        next_role: AgentRole,
-    ) -> Self {
+    pub fn new(id: impl Into<String>, manifest: impl Into<String>, next_role: AgentRole) -> Self {
         Self {
             id: id.into(),
             manifest: manifest.into(),
@@ -106,7 +102,10 @@ impl NodeExecutor for RoleHandoffNode {
 }
 
 /// Resolve the tool policy for the active role in state (or a fallback role).
-pub fn tool_policy_for_state(state: &AgentState, fallback: &AgentRole) -> crate::tools::ToolExecutionPolicy {
+pub fn tool_policy_for_state(
+    state: &AgentState,
+    fallback: &AgentRole,
+) -> crate::tools::ToolExecutionPolicy {
     let role = agent_role_from_state(state).unwrap_or_else(|| fallback.clone());
     tool_policy_for_role(&role)
 }

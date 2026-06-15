@@ -232,17 +232,15 @@ async fn get_session(
 
     match sessions.get(&session_id) {
         Some(shared_state) => {
-            let agent_state = shared_state
-                .read()
-                .map_err(|e| {
-                    (
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        Json(ErrorResponse {
-                            error: format!("Lock error: {}", e),
-                            code: "LOCK_ERROR",
-                        }),
-                    )
-                })?;
+            let agent_state = shared_state.read().map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(ErrorResponse {
+                        error: format!("Lock error: {}", e),
+                        code: "LOCK_ERROR",
+                    }),
+                )
+            })?;
             let data = serde_json::to_value(&*agent_state).unwrap_or_default();
             Ok(Json(data))
         }
@@ -332,7 +330,10 @@ async fn checkpoint(
                 "created_at": chrono::Utc::now().to_rfc3339(),
             });
 
-            info!("Created checkpoint {} for session {}", checkpoint_id, session_id);
+            info!(
+                "Created checkpoint {} for session {}",
+                checkpoint_id, session_id
+            );
 
             Ok(Json(checkpoint_data))
         }

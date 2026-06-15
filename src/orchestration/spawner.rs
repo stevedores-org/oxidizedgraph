@@ -73,7 +73,9 @@ impl SubgraphSpawner {
 
     /// Generate a unique subgraph ID
     pub fn generate_id(&self, prefix: &str) -> String {
-        let n = self.counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let n = self
+            .counter
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         format!("{}-{}", prefix, n)
     }
 
@@ -142,10 +144,7 @@ impl SubgraphSpawner {
 
     /// Get the number of currently active subgraphs
     pub fn active_count(&self) -> usize {
-        self.active
-            .read()
-            .map(|m| m.len())
-            .unwrap_or(0)
+        self.active.read().map(|m| m.len()).unwrap_or(0)
     }
 
     /// Check if any subgraphs are still running
@@ -197,7 +196,9 @@ impl<'a> SpawnBuilder<'a> {
         parent_state: &AgentState,
         mapper: &StateMapper,
     ) -> Self {
-        let handle = self.spawner.spawn_with_mapper(subgraph_id, graph, parent_state, mapper);
+        let handle = self
+            .spawner
+            .spawn_with_mapper(subgraph_id, graph, parent_state, mapper);
         self.handles.push(handle);
         self
     }
@@ -292,7 +293,10 @@ mod tests {
 
         assert!(result.is_completed());
         let state = result.state().unwrap();
-        assert_eq!(state.get_context::<String>("result"), Some("hello".to_string()));
+        assert_eq!(
+            state.get_context::<String>("result"),
+            Some("hello".to_string())
+        );
     }
 
     #[tokio::test]

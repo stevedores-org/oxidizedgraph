@@ -15,7 +15,7 @@ impl NodeExecutor for ProcessNode {
 
     async fn execute(&self, state: SharedState) -> Result<NodeOutput, NodeError> {
         println!("Processing...");
-        
+
         {
             let mut guard = state
                 .write()
@@ -23,7 +23,7 @@ impl NodeExecutor for ProcessNode {
             guard.add_assistant_message("Processed successfully!");
             guard.set_context("processed", true);
         }
-        
+
         Ok(NodeOutput::cont())
     }
 
@@ -43,16 +43,16 @@ impl NodeExecutor for FinalizeNode {
 
     async fn execute(&self, state: SharedState) -> Result<NodeOutput, NodeError> {
         println!("Finalizing...");
-        
+
         {
             let guard = state
                 .read()
                 .map_err(|e| NodeError::execution_failed(e.to_string()))?;
-            
+
             let processed: bool = guard.get_context("processed").unwrap_or(false);
             println!("Was processed: {}", processed);
         }
-        
+
         Ok(NodeOutput::finish())
     }
 }
@@ -81,12 +81,7 @@ async fn main() -> anyhow::Result<()> {
     let initial_state = AgentState::with_user_message("Hello, process this!");
 
     // Create runner and execute
-    let runner = GraphRunner::new(
-        graph,
-        RunnerConfig::new()
-            .max_iterations(10)
-            .verbose(true),
-    );
+    let runner = GraphRunner::new(graph, RunnerConfig::new().max_iterations(10).verbose(true));
 
     println!("Starting workflow execution...\n");
     let final_state = runner.invoke(initial_state).await?;
@@ -94,7 +89,7 @@ async fn main() -> anyhow::Result<()> {
     println!("\n=== Results ===");
     println!("Total iterations: {}", final_state.iteration);
     println!("Messages: {}", final_state.messages.len());
-    
+
     if let Some(last) = final_state.last_message() {
         println!("Last message: {}", last.content);
     }

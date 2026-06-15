@@ -65,12 +65,10 @@ impl SubgraphResult {
         match self {
             SubgraphResult::Completed { state, .. } => Ok(state),
             SubgraphResult::Failed { error, .. } => Err(error),
-            SubgraphResult::Cancelled { subgraph_id } => {
-                Err(RuntimeError::InvalidState(format!(
-                    "Subgraph '{}' was cancelled",
-                    subgraph_id
-                )))
-            }
+            SubgraphResult::Cancelled { subgraph_id } => Err(RuntimeError::InvalidState(format!(
+                "Subgraph '{}' was cancelled",
+                subgraph_id
+            ))),
         }
     }
 
@@ -97,7 +95,10 @@ pub struct SubgraphHandle {
 impl SubgraphHandle {
     /// Create a new subgraph handle
     pub(crate) fn new(subgraph_id: String, handle: JoinHandle<SubgraphResult>) -> Self {
-        Self { subgraph_id, handle }
+        Self {
+            subgraph_id,
+            handle,
+        }
     }
 
     /// Get the subgraph ID

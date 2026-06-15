@@ -62,7 +62,12 @@ impl MockCommandRunner {
     }
 
     /// Register a result for a check name.
-    pub fn with_result(mut self, name: impl Into<String>, exit_code: i32, output: impl Into<String>) -> Self {
+    pub fn with_result(
+        mut self,
+        name: impl Into<String>,
+        exit_code: i32,
+        output: impl Into<String>,
+    ) -> Self {
         self.results.insert(name.into(), (exit_code, output.into()));
         self
     }

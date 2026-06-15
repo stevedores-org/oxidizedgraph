@@ -1,7 +1,7 @@
 //! Integration tests for EPIC8 human-in-the-loop (#26).
 
-use oxidizedgraph::prelude::*;
 use oxidizedgraph::hitl::{CTX_APPROVAL_EVENTS, CTX_HITL_PAUSED};
+use oxidizedgraph::prelude::*;
 use std::sync::{Arc, RwLock};
 
 #[tokio::test]
@@ -17,7 +17,9 @@ async fn epic8_checkpoint_pauses_high_risk_change() {
 
     let guard = shared.read().unwrap();
     assert!(guard.get_context::<bool>(CTX_HITL_PAUSED).unwrap());
-    let events = guard.get_context::<Vec<ApprovalEvent>>(CTX_APPROVAL_EVENTS).unwrap();
+    let events = guard
+        .get_context::<Vec<ApprovalEvent>>(CTX_APPROVAL_EVENTS)
+        .unwrap();
     assert_eq!(events.len(), 1);
     assert_eq!(events[0].kind, "checkpoint_created");
 }
@@ -51,8 +53,8 @@ async fn epic8_low_risk_skips_pause() {
 
 #[test]
 fn epic8_timeline_merges_transitions_and_approvals() {
-    use oxidizedgraph::execution::TransitionRecord;
     use chrono::Utc;
+    use oxidizedgraph::execution::TransitionRecord;
 
     let transitions = vec![TransitionRecord {
         run_id: "r1".into(),

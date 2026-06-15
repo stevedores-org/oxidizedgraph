@@ -130,11 +130,7 @@ impl ReleaseOrchestrator {
 
     /// Create a release batch from CI-passed changes.
     pub fn create_batch(graph: &CrossRepoChangeGraph, change_ids: &[String]) -> ReleaseBatch {
-        ReleaseBatch::new(
-            &graph.objective_id,
-            &graph.run_id,
-            change_ids.to_vec(),
-        )
+        ReleaseBatch::new(&graph.objective_id, &graph.run_id, change_ids.to_vec())
     }
 }
 
