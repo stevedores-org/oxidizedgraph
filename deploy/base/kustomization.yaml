@@ -6,9 +6,12 @@ namespace: oxidizedgraph
 resources:
   - namespace.yaml
   - serviceaccount.yaml
+  - worker-serviceaccount.yaml
+  - rbac.yaml
   - configmap.yaml
   - service.yaml
   - deployment.yaml
+  - worker-job-template.yaml
 
 labels:
   - includeSelectors: true

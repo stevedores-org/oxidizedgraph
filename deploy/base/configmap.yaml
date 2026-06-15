@@ -5,3 +5,10 @@ metadata:
 data:
   PORT: "8080"
   RUST_LOG: info
+  WORKER_SPAWNER: memory
+  WORKER_NAMESPACE: oxidizedgraph
+  WORKER_SERVICE_ACCOUNT: oxidizedgraph-worker
+  WORKER_TTL_SECONDS: "3600"
+  ORCHESTRATOR_URL: http://oxidizedgraph:8080
+  ORCHESTRATOR_PUBLIC_URL: http://oxidizedgraph:8080
+  GITHUB_TOKEN_SECRET: github-app-token

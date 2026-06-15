@@ -14,7 +14,9 @@ use clap::{Parser, Subcommand};
 use oxidizedgraph::governance::{
     AgentDiscovery, GovernanceValidator, SymlinkManager, KNOWN_TARGETS,
 };
+use oxidizedgraph::a2a::{self, AgentCard, JsonRpcRequest, JsonRpcResponse, TaskStore};
 use oxidizedgraph::prelude::*;
+use oxidizedgraph::worker::{self, WorkerSpawner};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use tokio::sync::RwLock;
@@ -66,6 +68,9 @@ struct AppState {
     sessions: RwLock<HashMap<String, SharedState>>,
     workflow: CompiledGraph,
     checkpointer: Arc<MemoryCheckpointer>,
+    tasks: Arc<TaskStore>,
+    spawner: Arc<dyn WorkerSpawner>,
+    public_url: String,
 }
 
 /// Health check response
@@ -375,15 +380,23 @@ async fn handle_governance_cmd(cmd: GovernanceCommands) -> anyhow::Result<()> {
 }
 
 async fn run_server(port: u16) -> anyhow::Result<()> {
+    let public_url = std::env::var("ORCHESTRATOR_PUBLIC_URL")
+        .unwrap_or_else(|_| format!("http://127.0.0.1:{port}"));
+    let spawner = worker::spawner_from_env().await?;
     let state = Arc::new(AppState {
         sessions: RwLock::new(HashMap::new()),
         workflow: build_workflow(),
         checkpointer: Arc::new(MemoryCheckpointer::new()),
+        tasks: Arc::new(TaskStore::new()),
+        spawner: Arc::from(spawner),
+        public_url,
     });
 
     let app = Router::new()
         .route("/health", get(health))
         .route("/readiness", get(readiness))
+        .route("/rpc", post(a2a_rpc))
+        .route("/.well-known/agent-card.json", get(agent_card))
         .route("/api/v1/sessions", post(create_session))
         .route("/api/v1/sessions/:id", get(get_session))
         .route("/api/v1/sessions/:id/execute", post(execute))
@@ -420,6 +433,19 @@ async fn readiness() -> Json<HealthResponse> {
         status: "ready",
         version: env!("CARGO_PKG_VERSION"),
     })
+}
+
+/// A2A JSON-RPC endpoint (issue #41).
+async fn a2a_rpc(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<JsonRpcRequest>,
+) -> Json<JsonRpcResponse> {
+    Json(a2a::dispatch(req, &state.tasks, state.spawner.as_ref()).await)
+}
+
+/// Agent Card for A2A capability discovery.
+async fn agent_card(State(state): State<Arc<AppState>>) -> Json<AgentCard> {
+    Json(AgentCard::orchestrator(&state.public_url))
 }
 
 /// Create a new session

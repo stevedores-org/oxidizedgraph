@@ -41,6 +41,7 @@
 #![warn(missing_docs)]
 
 // Core modules
+pub mod a2a;
 pub mod checkpoint;
 pub mod cicd;
 pub mod diff;
@@ -60,6 +61,7 @@ pub mod planning;
 pub mod runner;
 pub mod state;
 pub mod tools;
+pub mod worker;
 
 // Deprecated modules — will be removed in v0.3.0
 // These contain an unused generic implementation that predates the
