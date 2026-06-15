@@ -29,6 +29,7 @@ Agents can reliably plan, code, test, review, recover from failures, and ship ch
 cargo run --example autonomous_dev_workflow
 cargo run --example role_orchestration_workflow
 cargo run --example planning_workflow
+cargo run --example hitl_workflow
 ```
 
 ### API Quick Reference
@@ -86,9 +87,24 @@ let scheduler = SchedulerNode::new("scheduler")
 let progress = PlanProgress::calculate(&plan);
 ```
 
+## Phase 2 Baseline — EPIC8 Human-in-the-Loop (Implemented)
+
+| Component | Module | Capabilities |
+|-----------|--------|--------------|
+| Approval policy | `hitl::policy` | `ApprovalMatrix`, `ApprovalPolicy` — risk class → pause/allow/deny |
+| Checkpoint types | `hitl::types` | `ApprovalRequest`, `ApprovalDecision`, `ExplanationPayload`, immutable `ApprovalEvent` audit log |
+| Graph nodes | `hitl::node` | `ApprovalCheckpointNode`, `GrantApprovalNode`, `ResumeNode` |
+| Operator timeline | `hitl::timeline` | `RunTimeline` merges transition log + approval events |
+
+### Example
+
+```bash
+cargo run --example hitl_workflow
+```
+
 ## Delivery Phases (Remaining)
 
-- **Phase 2 (remaining)**: EPIC5, EPIC8 — memory/retrieval, human-in-the-loop
+- **Phase 2 (remaining)**: EPIC5 — memory/retrieval
 - **Phase 3 (remaining)**: EPIC7, EPIC9 — self-healing, multi-repo CI/CD
 - **Phase 4**: EPIC10 — enterprise hardening
 
@@ -107,5 +123,6 @@ let progress = PlanProgress::calculate(&plan);
 - [#18](https://github.com/stevedores-org/oxidizedgraph/issues/18) — Roadmap parent
 - [#22](https://github.com/stevedores-org/oxidizedgraph/issues/22) — EPIC4 Code Quality Guardrails
 - [#24](https://github.com/stevedores-org/oxidizedgraph/issues/24) — EPIC6 Planning and Long-Horizon Autonomy
+- [#26](https://github.com/stevedores-org/oxidizedgraph/issues/26) — EPIC8 Human-in-the-Loop Controls
 - [#35](https://github.com/stevedores-org/oxidizedgraph/issues/35) — GovernanceNode
 - [#36](https://github.com/stevedores-org/oxidizedgraph/issues/36) — Agent Role-Based Routing
