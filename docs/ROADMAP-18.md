@@ -28,6 +28,7 @@ Agents can reliably plan, code, test, review, recover from failures, and ship ch
 ```bash
 cargo run --example autonomous_dev_workflow
 cargo run --example role_orchestration_workflow
+cargo run --example planning_workflow
 ```
 
 ### API Quick Reference
@@ -55,10 +56,40 @@ let policy = tool_policy_for_role(&AgentRole::Architect);
 
 Quality gates use `RiskClassifier::approval_route` so medium-risk changes route to a `review` edge when checks pass.
 
+## Phase 3 Baseline — EPIC6 Planning & Autonomy (Implemented)
+
+| Component | Module | Capabilities |
+|-----------|--------|--------------|
+| Plan model | `planning::plan` | `EpicPlan`, `Task`, `TaskStatus`, recovery injection |
+| Scheduler | `planning::scheduler` | Dependency resolution, cycle detection, critical-path prioritization |
+| Progress | `planning::progress` | `PlanProgress` with confidence score and ETA estimates |
+| Graph nodes | `planning::node` | `PlanningNode` (decomposition), `SchedulerNode` (schedule + auto-replan) |
+
+### Example
+
+```bash
+cargo run --example planning_workflow
+```
+
+### API Quick Reference
+
+```rust
+use oxidizedgraph::prelude::*;
+
+let planner = PlanningNode::with_decomposer("planner", |goal| {
+    vec![Task::new("t1", "Step 1", format!("Work on {goal}"))]
+});
+
+let scheduler = SchedulerNode::new("scheduler")
+    .register_recovery("t1", Task::new("recover", "Recover", "Fix failure"));
+
+let progress = PlanProgress::calculate(&plan);
+```
+
 ## Delivery Phases (Remaining)
 
 - **Phase 2 (remaining)**: EPIC5, EPIC8 — memory/retrieval, human-in-the-loop
-- **Phase 3**: EPIC6, EPIC7, EPIC9 — planning, self-healing, multi-repo CI/CD
+- **Phase 3 (remaining)**: EPIC7, EPIC9 — self-healing, multi-repo CI/CD
 - **Phase 4**: EPIC10 — enterprise hardening
 
 ## North-Star KPIs
@@ -75,5 +106,6 @@ Quality gates use `RiskClassifier::approval_route` so medium-risk changes route 
 
 - [#18](https://github.com/stevedores-org/oxidizedgraph/issues/18) — Roadmap parent
 - [#22](https://github.com/stevedores-org/oxidizedgraph/issues/22) — EPIC4 Code Quality Guardrails
+- [#24](https://github.com/stevedores-org/oxidizedgraph/issues/24) — EPIC6 Planning and Long-Horizon Autonomy
 - [#35](https://github.com/stevedores-org/oxidizedgraph/issues/35) — GovernanceNode
 - [#36](https://github.com/stevedores-org/oxidizedgraph/issues/36) — Agent Role-Based Routing

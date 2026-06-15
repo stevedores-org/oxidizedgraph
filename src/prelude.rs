@@ -10,7 +10,9 @@
 pub use crate::error::{GraphError, NodeError, RuntimeError};
 
 // State management
-pub use crate::state::{AgentState, Message, MessageRole, SharedState, SharedStateExt, State, ToolCall};
+pub use crate::state::{
+    AgentState, Message, MessageRole, SharedState, SharedStateExt, State, ToolCall,
+};
 
 // Graph building
 pub use crate::graph::{
@@ -28,15 +30,14 @@ pub use crate::checkpoint::{
 
 // Events and streaming
 pub use crate::events::{
-    Event, EventBus, EventHandler, EventKind, GraphEvent, LoggingHandler, MetricsHandler,
-    NodeEvent, StreamingRunner, StreamingRunResult, spawn_handler,
+    spawn_handler, Event, EventBus, EventHandler, EventKind, GraphEvent, LoggingHandler,
+    MetricsHandler, NodeEvent, StreamingRunResult, StreamingRunner,
 };
 
 // Multi-graph orchestration
 pub use crate::orchestration::{
-    JoinStrategy, ParallelSubgraphs, SubgraphHandle, SubgraphNode, SubgraphResult,
-    SubgraphSpawner, clone_state, extract_context, merge_all_context, merge_context_keys,
-    merge_under_namespace,
+    clone_state, extract_context, merge_all_context, merge_context_keys, merge_under_namespace,
+    JoinStrategy, ParallelSubgraphs, SubgraphHandle, SubgraphNode, SubgraphResult, SubgraphSpawner,
 };
 
 // Deterministic execution (roadmap EPIC1)
@@ -66,12 +67,17 @@ pub use crate::governance::{
     CTX_TOOL_POLICY_ROLE,
 };
 
+// Planning and autonomy (roadmap EPIC6)
+pub use crate::planning::{
+    EpicPlan, PlanProgress, PlanningNode, Scheduler, SchedulerNode, Task, TaskStatus,
+};
+
 // Built-in nodes
+pub use crate::nodes::tool::{AsyncFunctionTool, FunctionTool};
 pub use crate::nodes::{
     ConditionalNode, ContextRouterNode, DelayNode, EchoNode, FunctionNode, LLMConfig, LLMNode,
     LLMProvider, StaticTransitionNode, Tool, ToolNode, ToolNodeConfig, ToolRegistry,
 };
-pub use crate::nodes::tool::{AsyncFunctionTool, FunctionTool};
 
 // Re-exports from dependencies
 pub use async_trait::async_trait;
