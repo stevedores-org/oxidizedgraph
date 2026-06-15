@@ -1,6 +1,7 @@
-//! oxidizedgraph API Server
+//! oxidizedgraph API Server and governance CLI.
 //!
-//! REST API for executing graph-based AI agent workflows.
+//! REST API for executing graph-based AI agent workflows, plus subcommands
+//! for governance symlink sync, validation, and agent discovery.
 
 use axum::{
     extract::{Path, State},
@@ -9,6 +10,10 @@ use axum::{
     routing::{get, post},
     Router,
 };
+use clap::{Parser, Subcommand};
+use oxidizedgraph::governance::{
+    AgentDiscovery, GovernanceValidator, SymlinkManager, KNOWN_TARGETS,
+};
 use oxidizedgraph::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
@@ -16,6 +21,45 @@ use tokio::sync::RwLock;
 use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
 use uuid::Uuid;
+
+/// oxidizedgraph CLI and API server.
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Cli {
+    #[command(subcommand)]
+    command: Option<Commands>,
+}
+
+#[derive(Subcommand, Debug)]
+enum Commands {
+    /// Start the API server
+    Server {
+        #[arg(short, long, default_value_t = 8080)]
+        port: u16,
+    },
+    /// Governance operations
+    Governance {
+        #[command(subcommand)]
+        gov_cmd: GovernanceCommands,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum GovernanceCommands {
+    /// Validate governance configuration
+    Validate,
+    /// Sync symlinks
+    Sync,
+    /// Show symlink status
+    Status,
+    /// List discovered agents
+    ListAgents,
+    /// Validate graph compliance
+    CheckCompliance {
+        /// ID of the graph to check
+        graph_id: Option<String>,
+    },
+}
 
 /// Application state
 struct AppState {
@@ -240,7 +284,6 @@ where
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    // Initialize tracing
     let subscriber = FmtSubscriber::builder()
         .with_max_level(Level::INFO)
         .with_target(false)
@@ -248,20 +291,96 @@ async fn main() -> anyhow::Result<()> {
         .finish();
     tracing::subscriber::set_global_default(subscriber)?;
 
-    // Get port from environment
-    let port: u16 = std::env::var("PORT")
-        .ok()
-        .and_then(|p| p.parse().ok())
-        .unwrap_or(8080);
+    let cli = Cli::parse();
 
-    // Initialize app state
+    match cli.command.unwrap_or(Commands::Server { port: 8080 }) {
+        Commands::Server { port } => {
+            let port = std::env::var("PORT")
+                .ok()
+                .and_then(|p| p.parse().ok())
+                .unwrap_or(port);
+            run_server(port).await?;
+        }
+        Commands::Governance { gov_cmd } => {
+            handle_governance_cmd(gov_cmd).await?;
+        }
+    }
+
+    Ok(())
+}
+
+async fn handle_governance_cmd(cmd: GovernanceCommands) -> anyhow::Result<()> {
+    let base_dir = std::env::current_dir()?;
+    match cmd {
+        GovernanceCommands::Validate => {
+            println!("Validating governance configuration...");
+            let validator = GovernanceValidator::new(&base_dir);
+            let report = validator.validate_compliance();
+            if report.is_compliant {
+                println!("Governance setup is valid.");
+            } else {
+                println!("Governance setup is INVALID.");
+                for issue in report.issues {
+                    println!("- {issue}");
+                }
+            }
+        }
+        GovernanceCommands::Sync => {
+            println!("Synchronizing governance symlinks...");
+            let mgr = SymlinkManager::default(&base_dir);
+            let results = mgr.sync_all()?;
+            for (path, res) in results {
+                match res {
+                    Ok(_) => println!("Successfully synced {}", path.display()),
+                    Err(e) => println!("Failed to sync {}: {e}", path.display()),
+                }
+            }
+        }
+        GovernanceCommands::Status => {
+            println!("Governance symlinks status:");
+            let mgr = SymlinkManager::default(&base_dir);
+            for target in KNOWN_TARGETS {
+                if target == &"AGENTS.md" {
+                    continue;
+                }
+                let status = mgr.check_status(std::path::Path::new(target))?;
+                println!("- {target}: {status:?}");
+            }
+        }
+        GovernanceCommands::ListAgents => {
+            println!("Discovered Agents:");
+            let discovery = AgentDiscovery::new(&base_dir);
+            for agent in discovery.scan() {
+                println!(
+                    "- Name: {} (Role: {:?}) - {:?}",
+                    agent.name, agent.inferred_role, agent.guidance_path
+                );
+            }
+        }
+        GovernanceCommands::CheckCompliance { graph_id } => {
+            println!("Checking compliance for graph: {graph_id:?}");
+            let validator = GovernanceValidator::new(&base_dir);
+            let report = validator.validate_compliance();
+            if report.is_compliant {
+                println!("Compliance check passed.");
+            } else {
+                println!("Compliance check failed.");
+                for issue in report.issues {
+                    println!("- {issue}");
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+async fn run_server(port: u16) -> anyhow::Result<()> {
     let state = Arc::new(AppState {
         sessions: RwLock::new(HashMap::new()),
         workflow: build_workflow(),
         checkpointer: Arc::new(MemoryCheckpointer::new()),
     });
 
-    // Build router
     let app = Router::new()
         .route("/health", get(health))
         .route("/readiness", get(readiness))
@@ -278,9 +397,8 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/v1/sessions/:id/hitl/timeline", get(hitl_timeline))
         .with_state(state);
 
-    // Start server
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
-    info!("oxidizedgraph server starting on {}", addr);
+    info!("oxidizedgraph server starting on {addr}");
 
     let listener = tokio::net::TcpListener::bind(addr).await?;
     axum::serve(listener, app).await?;
