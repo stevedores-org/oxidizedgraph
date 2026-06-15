@@ -156,6 +156,17 @@ impl EpicPlan {
 
     /// Propagate failed/blocked statuses down the dependency tree.
     pub fn propagate_blocked_status(&mut self) {
+        // Recompute Blocked from scratch each call so this is idempotent and,
+        // crucially, *un-blocks* downstream tasks once their failed upstream is
+        // recovered (e.g. after `inject_recovery_task` resets a Failed task to
+        // Pending). Without this reset Blocked was a one-way latch, and the
+        // pipeline below a recovered task could never resume.
+        for task in self.tasks.values_mut() {
+            if task.status == TaskStatus::Blocked {
+                task.status = TaskStatus::Pending;
+            }
+        }
+
         loop {
             let mut changed = false;
             let mut failed_or_blocked_ids = std::collections::HashSet::new();
@@ -211,5 +222,65 @@ impl EpicPlan {
         self.propagate_blocked_status();
         self.updated_at = chrono::Utc::now();
         true
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn task(id: &str) -> Task {
+        Task::new(id, id, id)
+    }
+
+    /// Regression: after a failed task is recovered, its downstream tasks must
+    /// be un-blocked so the pipeline can resume. Previously `Blocked` was a
+    /// one-way latch and `c` stayed Blocked forever.
+    #[test]
+    fn recovery_unblocks_downstream_tasks() {
+        // a <- b <- c   (c depends on b, b depends on a)
+        let mut plan = EpicPlan::new("goal");
+        plan.add_task(task("a"));
+        plan.add_task(task("b").depends_on("a"));
+        plan.add_task(task("c").depends_on("b"));
+
+        // a fails -> b and c are blocked.
+        plan.get_task_mut("a").unwrap().status = TaskStatus::Failed;
+        plan.get_task_mut("a").unwrap().error = Some("boom".into());
+        plan.propagate_blocked_status();
+        assert_eq!(plan.get_task("b").unwrap().status, TaskStatus::Blocked);
+        assert_eq!(plan.get_task("c").unwrap().status, TaskStatus::Blocked);
+
+        // Inject recovery for a -> a resets to Pending and downstream unblocks.
+        assert!(plan.inject_recovery_task("a", task("a_recover")));
+        assert_eq!(plan.get_task("a").unwrap().status, TaskStatus::Pending);
+        assert_eq!(
+            plan.get_task("b").unwrap().status,
+            TaskStatus::Pending,
+            "b must un-block once its upstream is recovered"
+        );
+        assert_eq!(
+            plan.get_task("c").unwrap().status,
+            TaskStatus::Pending,
+            "c must un-block transitively"
+        );
+    }
+
+    /// A still-failed sibling dependency must keep its dependents Blocked even
+    /// after the idempotent reset-and-recompute.
+    #[test]
+    fn propagate_keeps_blocking_on_unrecovered_failure() {
+        let mut plan = EpicPlan::new("goal");
+        plan.add_task(task("ok"));
+        plan.add_task(task("bad"));
+        plan.add_task(task("dep").depends_on("ok").depends_on("bad"));
+
+        plan.get_task_mut("bad").unwrap().status = TaskStatus::Failed;
+        plan.propagate_blocked_status();
+        assert_eq!(plan.get_task("dep").unwrap().status, TaskStatus::Blocked);
+
+        // Calling again is idempotent — still Blocked, not flapped to Pending.
+        plan.propagate_blocked_status();
+        assert_eq!(plan.get_task("dep").unwrap().status, TaskStatus::Blocked);
     }
 }
