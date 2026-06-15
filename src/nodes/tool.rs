@@ -252,37 +252,42 @@ impl NodeExecutor for ToolNode {
     }
 
     async fn execute(&self, state: SharedState) -> Result<NodeOutput, NodeError> {
-        // Get pending tool calls and dynamic policy
-        let (tool_calls, dynamic_policy) = {
+        // Get pending tool calls
+        let tool_calls = {
             let guard = state
                 .read()
                 .map_err(|e| NodeError::execution_failed(e.to_string()))?;
-
-            let policy = crate::governance::tool_policy_for_state(
-                &guard,
-                &crate::governance::AgentRole::Builder,
-            );
-
-            (
-                guard.tool_calls.clone(),
-                crate::tools::policy::ToolPolicyEngine::new(policy),
-            )
+            guard.tool_calls.clone()
         };
 
         if tool_calls.is_empty() {
             return Ok(NodeOutput::cont());
         }
 
+        // Determine which policy engine to use
+        // 1. If the node has an explicitly configured policy, use it
+        // 2. Otherwise, check state for dynamic policy
+        let dynamic_engine;
+        let policy_to_use = if let Some(ref config_policy) = self.config.policy {
+            Some(config_policy)
+        } else {
+            let guard = state
+                .read()
+                .map_err(|e| NodeError::execution_failed(e.to_string()))?;
+            let policy = crate::governance::tool_policy_for_state(
+                &guard,
+                &crate::governance::AgentRole::Builder,
+            );
+            dynamic_engine = Some(crate::tools::policy::ToolPolicyEngine::new(policy));
+            dynamic_engine.as_ref()
+        };
+
         // Execute each tool call
         let mut results = Vec::new();
         for call in &tool_calls {
-            // Enforce tool restrictions: prefer dynamic policy from state, fallback to config
-            // Wait, if dynamic policy is always generated, it might overwrite config policy.
-            // Let's use dynamic policy, but in a real system we'd intersect them.
-            // For Phase 2, we just use dynamic_policy.
             let result = self
                 .registry
-                .execute_with_policy(call, Some(&dynamic_policy), self.config.tool_timeout)
+                .execute_with_policy(call, policy_to_use, self.config.tool_timeout)
                 .await;
             results.push(result);
         }
