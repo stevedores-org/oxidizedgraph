@@ -68,9 +68,19 @@ Runtime credentials (ECR pull, env, GKE WI bindings) are delivered by **External
 - **EKS**: IRSA or `imagePullSecrets` from ESO after CI pushes to ECR.
 
 ```bash
-kubectl apply -k deploy/overlays/gke-autopilot
 just deploy-eks
+# or: kubectl apply -k deploy/overlays/eks
 ```
+
+The **eks** overlay extends **gke-autopilot** and rewrites the image to ECR (`148080843892.dkr.ecr.us-east-2.amazonaws.com/stevedores-org/oxidizedgraph/server`). Pin a digest or tag before apply:
+
+```bash
+cd deploy/overlays/eks
+kustomize edit set image \
+  ghcr.io/stevedores-org/oxidizedgraph/server=148080843892.dkr.ecr.us-east-2.amazonaws.com/stevedores-org/oxidizedgraph/server:0.2.0-995a2d2
+```
+
+Mixed **arm64/amd64** node groups: the Autopilot overlay sets `nodeSelector: kubernetes.io/arch: amd64` (Nix CI images are linux/amd64).
 
 If NetworkPolicy/PDB were previously applied into `default`, delete them and re-apply the overlay.
 

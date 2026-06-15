@@ -28,6 +28,13 @@ pub use crate::checkpoint::{
     Checkpoint, CheckpointConfig, Checkpointer, CheckpointingRunner, MemoryCheckpointer, RunResult,
 };
 
+// Memory and retrieval
+pub use crate::memory::{
+    AgentMemoryStore, ContextPacker, ContextPolicy, ContextSection, DecisionMemory, DocumentKind,
+    EpisodicMemory, PackedContext, RepositoryDocument, RepositoryIndex, RetrievalQuery,
+    RetrievalResult, RunOutcome,
+};
+
 // Events and streaming
 pub use crate::events::{
     spawn_handler, Event, EventBus, EventHandler, EventKind, GraphEvent, LoggingHandler,
@@ -67,9 +74,38 @@ pub use crate::governance::{
     CTX_TOOL_POLICY_ROLE,
 };
 
-// Planning and autonomy (roadmap EPIC6)
+// Planning and autonomy (roadmap EPIC6/EPIC7)
 pub use crate::planning::{
     EpicPlan, PlanProgress, PlanningNode, Scheduler, SchedulerNode, Task, TaskStatus,
+    FailureClass, RetryPolicy, RecoveryRecord, classify_failure,
+};
+
+// Human-in-the-loop controls (roadmap EPIC8)
+pub use crate::hitl::{
+    append_approval_event, ApprovalAction, ApprovalCheckpointNode, ApprovalDecision,
+    ApprovalEvent, ApprovalMatrix, ApprovalPolicy, ApprovalRequest, ApprovalStatus,
+    ApproverRole, ExplanationPayload, GrantApprovalNode, ResumeNode, RunTimeline,
+    TimelineEntry, CTX_APPROVAL_DECISION, CTX_APPROVAL_EVENTS, CTX_APPROVAL_REQUEST,
+    CTX_EXPLANATION, CTX_HITL_PAUSED,
+};
+
+// Multi-repo CI/CD orchestration (roadmap EPIC9)
+pub use crate::cicd::{
+    CiAggregateNode, CiAggregateReport, CiAggregator, CiCheckSignal, CiConclusion,
+    CompleteRepoChangeNode, CrossRepoChangeGraph, MultiRepoCoordinator,
+    MultiRepoCoordinatorNode, ReleaseBatch, ReleaseGateNode, ReleaseGateResult,
+    ReleaseOrchestrator, RepoChange, RepoChangeStatus, CTX_CHANGE_GRAPH, CTX_CI_AGGREGATE,
+    CTX_CURRENT_REPO_CHANGE, CTX_RELEASE_GATE,
+};
+
+// Enterprise readiness (roadmap EPIC10)
+pub use crate::enterprise::{
+    AuditExportNode, AuditEventFields, AuditLog, AuditRecord, BudgetDecision, BudgetGuardNode, BudgetGuardrail,
+    ComplianceExport, ComplianceExporter, CostBudget, Permission, RbacPolicy, RbacRole,
+    RbacSubject, ScopedCredential, SecretHandle, SecretRedactor, SecretScopeNode, SecretStore,
+    SloObservation, SloRecordNode, SloTarget, SloTracker, TenantBoundaryResult, TenantGuard,
+    TenantGuardNode, TenantId, CTX_AUDIT_LOG, CTX_COST_BUDGET, CTX_RBAC_SUBJECT,
+    CTX_SCOPED_CREDENTIALS, CTX_SLO_TRACKER, CTX_TENANT_ID,
 };
 
 // Built-in nodes

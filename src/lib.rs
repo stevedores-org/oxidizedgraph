@@ -42,6 +42,9 @@
 
 // Core modules
 pub mod checkpoint;
+pub mod cicd;
+pub mod diff;
+pub mod enterprise;
 pub mod error;
 pub mod events;
 pub mod execution;
@@ -49,6 +52,8 @@ pub mod git;
 pub mod governance;
 pub mod graph;
 pub mod guardrails;
+pub mod hitl;
+pub mod memory;
 pub mod nodes;
 pub mod orchestration;
 pub mod planning;
