@@ -65,6 +65,18 @@ path = "examples/streaming_events.rs"
 name = "multi_agent"
 path = "examples/multi_agent.rs"
 
+[[example]]
+name = "autonomous_dev_workflow"
+path = "examples/autonomous_dev_workflow.rs"
+
+[[example]]
+name = "role_orchestration_workflow"
+path = "examples/role_orchestration_workflow.rs"
+
+[[example]]
+name = "planning_workflow"
+path = "examples/planning_workflow.rs"
+
 [[bin]]
 name = "oxidizedgraph-server"
 path = "src/bin/server.rs"

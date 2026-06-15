@@ -1,6 +1,7 @@
 //! # oxidizedgraph
 //!
 //! A humble attempt at LangGraph in Rust - high-performance agent orchestration framework.
+#![cfg_attr(test, allow(deprecated))]
 //!
 //! oxidizedgraph provides graph-based agent workflows with:
 //! - **Type-safe state management** with `AgentState` and `SharedState`
@@ -41,14 +42,20 @@
 
 // Core modules
 pub mod checkpoint;
+pub mod diff;
 pub mod error;
 pub mod events;
+pub mod execution;
 pub mod git;
+pub mod governance;
 pub mod graph;
+pub mod guardrails;
 pub mod nodes;
 pub mod orchestration;
+pub mod planning;
 pub mod runner;
 pub mod state;
+pub mod tools;
 
 // Deprecated modules — will be removed in v0.3.0
 // These contain an unused generic implementation that predates the

@@ -9,7 +9,7 @@
 pub mod conditional;
 pub mod function;
 pub mod llm;
-pub mod quality;
+pub mod quality_gate;
 pub mod tool;
 
 use async_trait::async_trait;
@@ -211,7 +211,8 @@ impl NodeExecutor for ContextRouterNode {
 pub use conditional::ConditionalNode;
 pub use function::FunctionNode;
 pub use llm::{LLMConfig, LLMNode, LLMProvider};
-pub use tool::{Tool, ToolNode, ToolRegistry};
+pub use quality_gate::{QualityGateConfig, QualityGateNode};
+pub use tool::{Tool, ToolNode, ToolNodeConfig, ToolRegistry};
 
 #[cfg(test)]
 mod tests {
