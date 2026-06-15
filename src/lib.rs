@@ -42,6 +42,7 @@
 
 // Core modules
 pub mod checkpoint;
+pub mod diff;
 pub mod error;
 pub mod events;
 pub mod execution;
