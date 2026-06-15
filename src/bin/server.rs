@@ -118,7 +118,7 @@ fn build_workflow() -> CompiledGraph {
                     (
                         guard
                             .get_context::<serde_json::Value>("input")
-                            .unwrap_or_else(|| serde_json::Value::Null),
+                            .unwrap_or(serde_json::Value::Null),
                         guard.get_context::<String>("run_id").unwrap_or_default(),
                         guard
                             .get_context::<String>("session_id")

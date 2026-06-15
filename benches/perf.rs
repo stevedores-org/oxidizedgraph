@@ -95,7 +95,7 @@ fn benchmark_checkpoint_save(c: &mut Criterion) {
 
     c.bench_function("checkpoint_save", |b| {
         b.iter_batched(
-            || MemoryCheckpointer::new(),
+            MemoryCheckpointer::new,
             |checkpointer| {
                 runtime.block_on(async {
                     checkpointer
