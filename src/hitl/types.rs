@@ -15,6 +15,15 @@ pub const CTX_APPROVAL_DECISION: &str = "approval_decision";
 pub const CTX_APPROVAL_EVENTS: &str = "approval_events";
 /// Context key: standardized explanation for operators.
 pub const CTX_EXPLANATION: &str = "hitl_explanation";
+/// Context key: pending operator edits applied before resume.
+pub const CTX_HITL_EDITS: &str = "hitl_edits";
+
+/// Operator patch set applied at an intervention checkpoint.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct InterventionEdit {
+    /// Context key/value patches (merged into agent state).
+    pub context_patches: std::collections::HashMap<String, serde_json::Value>,
+}
 
 /// Lifecycle status of an approval request.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -170,6 +179,16 @@ impl ApprovalEvent {
             timestamp: chrono::Utc::now(),
             kind: "decision_recorded".to_string(),
             detail: serde_json::to_value(decision).unwrap_or(serde_json::Value::Null),
+        }
+    }
+
+    /// Record operator context edits before resume.
+    pub fn intervention_edited(edits: &InterventionEdit) -> Self {
+        Self {
+            id: Uuid::new_v4().to_string(),
+            timestamp: chrono::Utc::now(),
+            kind: "intervention_edited".to_string(),
+            detail: serde_json::to_value(edits).unwrap_or(serde_json::Value::Null),
         }
     }
 }

@@ -92,6 +92,12 @@ If NetworkPolicy/PDB were previously applied into `default`, delete them and re-
 | `/readiness` | GET | Readiness (k8s probe) |
 | `/api/v1/sessions` | POST | Create session |
 | `/api/v1/sessions/{id}/execute` | POST | Run graph |
+| `/api/v1/sessions/{id}/hitl/status` | GET | HITL pause/request/explanation status |
+| `/api/v1/sessions/{id}/hitl/pause` | POST | Operator pause + checkpoint |
+| `/api/v1/sessions/{id}/hitl/edit` | POST | Queue context edits before resume |
+| `/api/v1/sessions/{id}/hitl/approve` | POST | Approve and resume |
+| `/api/v1/sessions/{id}/hitl/deny` | POST | Deny action |
+| `/api/v1/sessions/{id}/hitl/timeline` | GET | Approval + transition timeline |
 
 ```bash
 kubectl -n oxidizedgraph port-forward svc/oxidizedgraph 8080:8080
@@ -100,6 +106,7 @@ curl -s http://localhost:8080/health
 curl -s -X POST http://localhost:8080/api/v1/sessions \
   -H 'Content-Type: application/json' \
   -d '{}'
+curl -s http://localhost:8080/api/v1/sessions/{id}/hitl/status
 ```
 
 ## Environment

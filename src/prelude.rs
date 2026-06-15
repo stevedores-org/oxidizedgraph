@@ -84,9 +84,11 @@ pub use crate::planning::{
 pub use crate::hitl::{
     append_approval_event, ApprovalAction, ApprovalCheckpointNode, ApprovalDecision,
     ApprovalEvent, ApprovalMatrix, ApprovalPolicy, ApprovalRequest, ApprovalStatus,
-    ApproverRole, ExplanationPayload, GrantApprovalNode, ResumeNode, RunTimeline,
-    TimelineEntry, CTX_APPROVAL_DECISION, CTX_APPROVAL_EVENTS, CTX_APPROVAL_REQUEST,
-    CTX_EXPLANATION, CTX_HITL_PAUSED,
+    ApproverRole, EditInterventionNode, ExplanationPayload, GrantApprovalNode, HitlController,
+    HitlError, HitlStatus, InterventionEdit, ResumeNode, ReviewSummary, ReviewSummaryBuilder,
+    RunTimeline, TimelineEntry, CTX_APPROVAL_DECISION, CTX_APPROVAL_EVENTS, CTX_APPROVAL_REQUEST,
+    CTX_EXPLANATION, CTX_HITL_EDITS, CTX_HITL_PAUSED, CTX_PROPOSED_DIFF, CTX_RECENT_TOOL_ACTIONS,
+    CTX_REVIEW_FINDINGS,
 };
 
 // Multi-repo CI/CD orchestration (roadmap EPIC9)

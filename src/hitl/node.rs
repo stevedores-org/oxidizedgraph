@@ -7,11 +7,11 @@ use crate::graph::{NodeExecutor, NodeOutput};
 use crate::guardrails::RiskLevel;
 use crate::state::SharedState;
 
+use super::explain::ReviewSummaryBuilder;
 use super::policy::{ApprovalAction, ApprovalPolicy};
 use super::types::{
     append_approval_event, ApprovalDecision, ApprovalEvent, ApprovalRequest, ApprovalStatus,
-    ExplanationPayload, CTX_APPROVAL_DECISION, CTX_APPROVAL_REQUEST, CTX_EXPLANATION,
-    CTX_HITL_PAUSED,
+    CTX_APPROVAL_DECISION, CTX_APPROVAL_REQUEST, CTX_EXPLANATION, CTX_HITL_PAUSED,
 };
 
 /// Pauses execution when policy requires human approval for the current risk level.
@@ -87,10 +87,12 @@ impl NodeExecutor for ApprovalCheckpointNode {
                 )
                 .with_summary(&summary);
 
-                let explanation = ExplanationPayload::new(
-                    summary,
+                let summarizer = ReviewSummaryBuilder::new();
+                let review = summarizer.from_state(
+                    &guard,
                     format!("Risk level {risk:?} matched pause policy"),
                 );
+                let explanation = summarizer.to_explanation(&review);
                 append_approval_event(&mut guard, ApprovalEvent::checkpoint_created(&request));
                 guard.set_context(CTX_APPROVAL_REQUEST, request);
                 guard.set_context(CTX_EXPLANATION, explanation);
@@ -157,6 +159,39 @@ impl NodeExecutor for GrantApprovalNode {
 
     fn description(&self) -> Option<&str> {
         Some("Records operator approval and resumes the workflow")
+    }
+}
+
+/// Applies queued operator edits before resuming execution.
+#[derive(Clone, Debug, Default)]
+pub struct EditInterventionNode {
+    id: String,
+}
+
+impl EditInterventionNode {
+    /// Create an edit intervention node.
+    pub fn new(id: impl Into<String>) -> Self {
+        Self { id: id.into() }
+    }
+}
+
+#[async_trait]
+impl NodeExecutor for EditInterventionNode {
+    fn id(&self) -> &str {
+        &self.id
+    }
+
+    async fn execute(&self, state: SharedState) -> Result<NodeOutput, NodeError> {
+        let mut guard = state
+            .write()
+            .map_err(|e| NodeError::execution_failed(e.to_string()))?;
+
+        super::intervention::HitlController::apply_edits(&mut guard);
+        Ok(NodeOutput::cont())
+    }
+
+    fn description(&self) -> Option<&str> {
+        Some("Applies operator context edits queued during HITL pause")
     }
 }
 
