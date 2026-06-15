@@ -482,7 +482,7 @@ impl CompiledGraph {
         let mut output = String::from("graph TD\n");
 
         // Add nodes
-        for (id, _) in &self.node_indices {
+        for id in self.node_indices.keys() {
             if id != transitions::END {
                 output.push_str(&format!("    {}[{}]\n", id.replace('-', "_"), id));
             } else {

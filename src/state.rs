@@ -193,6 +193,7 @@ impl State for AgentState {
     fn schema() -> serde_json::Value {
         serde_json::json!({
             "type": "object",
+            "required": ["messages", "tool_calls", "context"],
             "properties": {
                 "messages": { "type": "array", "channel": "append" },
                 "tool_calls": { "type": "array" },
