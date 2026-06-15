@@ -7,6 +7,7 @@ use crate::graph::{NodeExecutor, NodeOutput};
 use crate::planning::plan::{EpicPlan, Task, TaskStatus};
 use crate::planning::progress::PlanProgress;
 use crate::planning::scheduler::Scheduler;
+use crate::planning::self_healing::{FailureClass, RetryPolicy, RecoveryRecord, classify_failure};
 use crate::state::SharedState;
 
 /// Type alias for the goal decomposer closure.
@@ -88,6 +89,8 @@ pub struct SchedulerNode {
     id: String,
     scheduler: Scheduler,
     auto_replan_recoveries: HashMap<String, Task>,
+    self_healing_enabled: bool,
+    retry_policies: HashMap<FailureClass, RetryPolicy>,
 }
 
 impl SchedulerNode {
@@ -97,6 +100,8 @@ impl SchedulerNode {
             id: id.into(),
             scheduler: Scheduler::new(),
             auto_replan_recoveries: HashMap::new(),
+            self_healing_enabled: true,
+            retry_policies: HashMap::new(),
         }
     }
 
@@ -108,6 +113,18 @@ impl SchedulerNode {
     ) -> Self {
         self.auto_replan_recoveries
             .insert(failed_task_id.into(), recovery_task);
+        self
+    }
+
+    /// Enable or disable self-healing.
+    pub fn with_self_healing(mut self, enabled: bool) -> Self {
+        self.self_healing_enabled = enabled;
+        self
+    }
+
+    /// Set a custom retry policy for a specific failure class.
+    pub fn with_retry_policy(mut self, class: FailureClass, policy: RetryPolicy) -> Self {
+        self.retry_policies.insert(class, policy);
         self
     }
 }
@@ -145,23 +162,118 @@ impl NodeExecutor for SchedulerNode {
         }
 
         if has_failures {
-            let mut replanned = false;
+            let mut attempts: HashMap<String, usize> = guard.get_context("task_attempts").unwrap_or_default();
+            let mut history: Vec<RecoveryRecord> = guard.get_context("recovery_history").unwrap_or_default();
+            let mut replanned_all = true;
+            let mut replanned_any = false;
+
             for failed_id in failed_ids {
-                if let Some(recovery) = self.auto_replan_recoveries.get(&failed_id).cloned() {
-                    // Inject the recovery task
-                    plan.inject_recovery_task(&failed_id, recovery);
-                    replanned = true;
+                let task = plan.get_task(&failed_id).unwrap().clone();
+                let error_msg = task.error.clone().unwrap_or_else(|| "Unknown error".to_string());
+
+                if self.self_healing_enabled {
+                    let class = classify_failure(&error_msg);
+                    let policy = self.retry_policies.get(&class).cloned().unwrap_or_else(|| {
+                        match class {
+                            FailureClass::Compile => RetryPolicy::compile_default(),
+                            FailureClass::Test => RetryPolicy::test_default(),
+                            FailureClass::Runtime => RetryPolicy::runtime_default(),
+                            FailureClass::Integration => RetryPolicy::integration_default(),
+                            FailureClass::Unknown => RetryPolicy::default(),
+                        }
+                    });
+
+                    let current_attempts = *attempts.get(&failed_id).unwrap_or(&0);
+
+                    if current_attempts < policy.max_attempts {
+                        let attempt = current_attempts + 1;
+                        attempts.insert(failed_id.clone(), attempt);
+
+                        // If a manual recovery is registered, use it, else generate dynamically
+                        let recovery = if let Some(manual_rec) = self.auto_replan_recoveries.get(&failed_id).cloned() {
+                            manual_rec
+                        } else {
+                            let rec_id = format!("recovery_{}_{}", failed_id, attempt);
+                            let rec_name = format!("Remediate {} failure in {}", class.as_str(), task.name);
+                            let rec_desc = format!(
+                                "Self-healing task injected for {} (Attempt {}/{}) due to: {}",
+                                task.id, attempt, policy.max_attempts, error_msg
+                            );
+                            Task::new(rec_id, rec_name, rec_desc)
+                        };
+
+                        let record = RecoveryRecord::new(
+                            failed_id.clone(),
+                            attempt,
+                            class,
+                            error_msg.clone(),
+                            "Inject recovery task",
+                            format!(
+                                "Classified as {:?}. Injected recovery task {}/{} attempts.",
+                                class, attempt, policy.max_attempts
+                            )
+                        );
+                        history.push(record);
+
+                        tracing::info!(
+                            task_id = %failed_id,
+                            attempt = attempt,
+                            class = ?class,
+                            "Recovery decision: Inject recovery task. Rationale: classified as {:?}, attempt {}/{}",
+                            class,
+                            attempt,
+                            policy.max_attempts
+                        );
+
+                        plan.inject_recovery_task(&failed_id, recovery);
+                        replanned_any = true;
+                    } else {
+                        let record = RecoveryRecord::new(
+                            failed_id.clone(),
+                            current_attempts,
+                            class,
+                            error_msg.clone(),
+                            "Halted (max attempts)",
+                            format!(
+                                "Exceeded max attempts ({}) for failure class {:?}",
+                                policy.max_attempts, class
+                            )
+                        );
+                        history.push(record);
+
+                        tracing::warn!(
+                            task_id = %failed_id,
+                            attempts = current_attempts,
+                            class = ?class,
+                            "Recovery decision: Halted (max attempts). Rationale: Exceeded max attempts ({}) for failure class {:?}",
+                            policy.max_attempts,
+                            class
+                        );
+
+                        replanned_all = false;
+                    }
+                } else {
+                    // Backwards-compatible behavior
+                    if let Some(recovery) = self.auto_replan_recoveries.get(&failed_id).cloned() {
+                        plan.inject_recovery_task(&failed_id, recovery);
+                        replanned_any = true;
+                    } else {
+                        replanned_all = false;
+                    }
                 }
             }
 
-            if replanned {
+            guard.set_context("task_attempts", attempts);
+            guard.set_context("recovery_history", history);
+
+            if replanned_any && replanned_all {
                 // Save plan and progress, then transition back to schedule the recovery task
                 guard.set_context("epic_plan", plan.clone());
                 let progress = PlanProgress::calculate(&plan);
                 guard.set_context("plan_progress", progress);
                 return Ok(NodeOutput::Transition("replan_injected".to_string()));
             } else {
-                // Cannot recover, route to failure or manual replan
+                // Cannot recover or limit exceeded, route to failure or manual replan
                 return Ok(NodeOutput::Transition("replan_needed".to_string()));
             }
         }

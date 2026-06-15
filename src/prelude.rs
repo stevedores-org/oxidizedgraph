@@ -67,9 +67,10 @@ pub use crate::governance::{
     CTX_TOOL_POLICY_ROLE,
 };
 
-// Planning and autonomy (roadmap EPIC6)
+// Planning and autonomy (roadmap EPIC6/EPIC7)
 pub use crate::planning::{
     EpicPlan, PlanProgress, PlanningNode, Scheduler, SchedulerNode, Task, TaskStatus,
+    FailureClass, RetryPolicy, RecoveryRecord, classify_failure,
 };
 
 // Built-in nodes
