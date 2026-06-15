@@ -27,15 +27,15 @@ images:
 
 kustomize-check:
     kubectl kustomize deploy/overlays/gke-autopilot > /dev/null
+    kubectl kustomize deploy/overlays/eks > /dev/null
 
 deploy-gke:
     kubectl apply -k deploy/overlays/gke-autopilot
 
-# ECR image built by CI (linux/amd64). Override registry/repo via env.
+# EKS: gke-autopilot overlay + ECR image (CI publish-ecr). Override tag/registry via kustomize edit.
 ecr-registry := env_var_or_default("ECR_REGISTRY", "148080843892.dkr.ecr.us-east-2.amazonaws.com")
 ecr-image := ecr-registry + "/stevedores-org/oxidizedgraph/server:" + image-tag
 
 deploy-eks:
-    kubectl apply -k deploy/overlays/gke-autopilot
-    kubectl -n oxidizedgraph set image deployment/oxidizedgraph oxidizedgraph={{ecr-image}}
+    kubectl apply -k deploy/overlays/eks
     kubectl -n oxidizedgraph rollout status deployment/oxidizedgraph
