@@ -102,10 +102,37 @@ let progress = PlanProgress::calculate(&plan);
 cargo run --example hitl_workflow
 ```
 
+## Phase 2 Baseline — EPIC5 Memory & Retrieval (Implemented)
+
+| Component | Module | Capabilities |
+|-----------|--------|--------------|
+| Repository index | `memory` | `RepositoryIndex`, `RetrievalQuery` — lexical ranking with path/symbol filters |
+| Episodic memory | `memory` | `AgentMemoryStore`, `EpisodicMemory` — prior runs keyed by task/run/repo |
+| Decision memory | `memory` | `DecisionMemory` — queryable rationale for major changes |
+| Context packing | `memory` | `ContextPacker`, `ContextPolicy` — token-budgeted prompt assembly |
+
+### Example
+
+```bash
+cargo run --example memory_workflow
+```
+
+### API Quick Reference
+
+```rust
+use oxidizedgraph::prelude::*;
+
+let mut index = RepositoryIndex::new();
+index.index_document(RepositoryDocument::source(repo, path, content));
+
+let hits = index.query(&RetrievalQuery::new("context packing").repo(repo));
+let store = AgentMemoryStore::new();
+let packed = ContextPacker::new(8_000).pack(&hits, &episodes, &decisions, &ContextPolicy::default());
+```
+
 ## Delivery Phases (Remaining)
 
-- **Phase 2 (remaining)**: EPIC5 — memory/retrieval
-- **Phase 3 (remaining)**: EPIC7, EPIC9 — self-healing, multi-repo CI/CD
+- **Phase 3 (remaining)**: EPIC9 — multi-repo CI/CD
 - **Phase 4**: EPIC10 — enterprise hardening
 
 ## North-Star KPIs
@@ -123,6 +150,7 @@ cargo run --example hitl_workflow
 - [#18](https://github.com/stevedores-org/oxidizedgraph/issues/18) — Roadmap parent
 - [#22](https://github.com/stevedores-org/oxidizedgraph/issues/22) — EPIC4 Code Quality Guardrails
 - [#24](https://github.com/stevedores-org/oxidizedgraph/issues/24) — EPIC6 Planning and Long-Horizon Autonomy
+- [#23](https://github.com/stevedores-org/oxidizedgraph/issues/23) — EPIC5 Memory, Context, and Retrieval
 - [#26](https://github.com/stevedores-org/oxidizedgraph/issues/26) — EPIC8 Human-in-the-Loop Controls
 - [#35](https://github.com/stevedores-org/oxidizedgraph/issues/35) — GovernanceNode
 - [#36](https://github.com/stevedores-org/oxidizedgraph/issues/36) — Agent Role-Based Routing
