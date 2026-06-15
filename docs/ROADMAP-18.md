@@ -29,6 +29,7 @@ Agents can reliably plan, code, test, review, recover from failures, and ship ch
 cargo run --example autonomous_dev_workflow
 cargo run --example role_orchestration_workflow
 cargo run --example planning_workflow
+cargo run --example hitl_workflow
 ```
 
 ### API Quick Reference
@@ -86,11 +87,100 @@ let scheduler = SchedulerNode::new("scheduler")
 let progress = PlanProgress::calculate(&plan);
 ```
 
-## Delivery Phases (Remaining)
+## Phase 2 Baseline — EPIC8 Human-in-the-Loop (Implemented)
 
-- **Phase 2 (remaining)**: EPIC5, EPIC8 — memory/retrieval, human-in-the-loop
-- **Phase 3 (remaining)**: EPIC7, EPIC9 — self-healing, multi-repo CI/CD
-- **Phase 4**: EPIC10 — enterprise hardening
+| Component | Module | Capabilities |
+|-----------|--------|--------------|
+| Approval policy | `hitl::policy` | `ApprovalMatrix`, `ApprovalPolicy` — risk class → pause/allow/deny |
+| Checkpoint types | `hitl::types` | `ApprovalRequest`, `ApprovalDecision`, `ExplanationPayload`, immutable `ApprovalEvent` audit log |
+| Graph nodes | `hitl::node` | `ApprovalCheckpointNode`, `GrantApprovalNode`, `ResumeNode` |
+| Operator timeline | `hitl::timeline` | `RunTimeline` merges transition log + approval events |
+
+### Example
+
+```bash
+cargo run --example hitl_workflow
+```
+
+## Phase 2 Baseline — EPIC5 Memory & Retrieval (Implemented)
+
+| Component | Module | Capabilities |
+|-----------|--------|--------------|
+| Repository index | `memory` | `RepositoryIndex`, `RetrievalQuery` — lexical ranking with path/symbol filters |
+| Episodic memory | `memory` | `AgentMemoryStore`, `EpisodicMemory` — prior runs keyed by task/run/repo |
+| Decision memory | `memory` | `DecisionMemory` — queryable rationale for major changes |
+| Context packing | `memory` | `ContextPacker`, `ContextPolicy` — token-budgeted prompt assembly |
+
+### Example
+
+```bash
+cargo run --example memory_workflow
+cargo run --example multirepo_cicd_workflow
+```
+
+### API Quick Reference
+
+```rust
+use oxidizedgraph::prelude::*;
+
+let mut index = RepositoryIndex::new();
+index.index_document(RepositoryDocument::source(repo, path, content));
+
+let hits = index.query(&RetrievalQuery::new("context packing").repo(repo));
+let store = AgentMemoryStore::new();
+let packed = ContextPacker::new(8_000).pack(&hits, &episodes, &decisions, &ContextPolicy::default());
+```
+
+## Phase 3 Baseline — EPIC9 Multi-Repo CI/CD (Implemented)
+
+| Component | Module | Capabilities |
+|-----------|--------|--------------|
+| Change graph | `cicd::change_graph` | `CrossRepoChangeGraph`, `RepoChange` — dependency-aware multi-repo changes |
+| Coordinator | `cicd::coordinator` | `MultiRepoCoordinator` — ordered execution, failure propagation |
+| CI aggregation | `cicd::ci_aggregate` | `CiAggregator`, `CiAggregateReport` — objective-level CI consolidation |
+| Release gating | `cicd::release` | `ReleaseOrchestrator`, `ReleaseBatch` — blocks rollout on downstream breakage |
+| Graph nodes | `cicd::node` | `MultiRepoCoordinatorNode`, `CiAggregateNode`, `ReleaseGateNode` |
+
+### Example
+
+```bash
+cargo run --example multirepo_cicd_workflow
+cargo run --example enterprise_workflow
+```
+
+### API Quick Reference
+
+```rust
+use oxidizedgraph::prelude::*;
+
+let guard = TenantGuard::new();
+let result = guard.check_access(&subject, &tenant, Permission::Execute, &RbacPolicy::enterprise_default());
+
+let redactor = SecretRedactor::enterprise_default();
+let safe = redactor.redact(log_line);
+
+let export = ComplianceExporter::new().export_tenant(&audit_log, "acme-corp");
+```
+
+## Phase 4 Baseline — EPIC10 Enterprise Readiness (Implemented)
+
+| Component | Module | Capabilities |
+|-----------|--------|--------------|
+| Tenancy & RBAC | `enterprise::tenant` | `TenantGuard`, `RbacPolicy`, `Permission` — cross-tenant boundary enforcement |
+| Secrets | `enterprise::secrets` | `SecretHandle`, `ScopedCredential`, `SecretRedactor` — scoped access without log exposure |
+| Audit | `enterprise::audit` | `AuditLog` hash chain, `ComplianceExporter` — immutable compliance export |
+| SLO & budget | `enterprise::slo` | `SloTracker`, `BudgetGuardrail`, `CostBudget` — error budget and spend guardrails |
+| Graph nodes | `enterprise::node` | `TenantGuardNode`, `SecretScopeNode`, `BudgetGuardNode`, `SloRecordNode`, `AuditExportNode` |
+
+### Example
+
+```bash
+cargo run --example enterprise_workflow
+```
+
+## Delivery Phases
+
+All roadmap epics for #18 are implemented on `develop`.
 
 ## North-Star KPIs
 
@@ -107,5 +197,9 @@ let progress = PlanProgress::calculate(&plan);
 - [#18](https://github.com/stevedores-org/oxidizedgraph/issues/18) — Roadmap parent
 - [#22](https://github.com/stevedores-org/oxidizedgraph/issues/22) — EPIC4 Code Quality Guardrails
 - [#24](https://github.com/stevedores-org/oxidizedgraph/issues/24) — EPIC6 Planning and Long-Horizon Autonomy
+- [#23](https://github.com/stevedores-org/oxidizedgraph/issues/23) — EPIC5 Memory, Context, and Retrieval
+- [#27](https://github.com/stevedores-org/oxidizedgraph/issues/27) — EPIC9 Multi-Repo and CI/CD Orchestration
+- [#28](https://github.com/stevedores-org/oxidizedgraph/issues/28) — EPIC10 Enterprise Readiness
+- [#26](https://github.com/stevedores-org/oxidizedgraph/issues/26) — EPIC8 Human-in-the-Loop Controls
 - [#35](https://github.com/stevedores-org/oxidizedgraph/issues/35) — GovernanceNode
 - [#36](https://github.com/stevedores-org/oxidizedgraph/issues/36) — Agent Role-Based Routing
