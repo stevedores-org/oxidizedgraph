@@ -44,6 +44,7 @@
 pub mod checkpoint;
 pub mod cicd;
 pub mod diff;
+pub mod enterprise;
 pub mod error;
 pub mod events;
 pub mod execution;
