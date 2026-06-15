@@ -98,6 +98,16 @@ pub use crate::cicd::{
     CTX_CURRENT_REPO_CHANGE, CTX_RELEASE_GATE,
 };
 
+// Enterprise readiness (roadmap EPIC10)
+pub use crate::enterprise::{
+    AuditExportNode, AuditEventFields, AuditLog, AuditRecord, BudgetDecision, BudgetGuardNode, BudgetGuardrail,
+    ComplianceExport, ComplianceExporter, CostBudget, Permission, RbacPolicy, RbacRole,
+    RbacSubject, ScopedCredential, SecretHandle, SecretRedactor, SecretScopeNode, SecretStore,
+    SloObservation, SloRecordNode, SloTarget, SloTracker, TenantBoundaryResult, TenantGuard,
+    TenantGuardNode, TenantId, CTX_AUDIT_LOG, CTX_COST_BUDGET, CTX_RBAC_SUBJECT,
+    CTX_SCOPED_CREDENTIALS, CTX_SLO_TRACKER, CTX_TENANT_ID,
+};
+
 // Built-in nodes
 pub use crate::nodes::tool::{AsyncFunctionTool, FunctionTool};
 pub use crate::nodes::{
