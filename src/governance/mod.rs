@@ -7,6 +7,7 @@
 //! - [`GovernanceNode`] for applying manifest guidance to [`AgentState`]
 //! - Role routing primitives ([`RoleRouterNode`], [`RoleHandoffNode`])
 //! - Per-role tool restrictions via [`tool_policy_for_role`]
+//! - Symlink sync, agent discovery, and compliance validation (Epic #30)
 //!
 //! [issue]: https://github.com/stevedores-org/oxidizedgraph/issues/31
 //! [roadmap]: https://github.com/stevedores-org/oxidizedgraph/issues/18
@@ -32,13 +33,17 @@
 //! ```
 
 pub mod config;
+pub mod discovery;
 pub mod guidance;
 pub mod node;
 pub mod parser;
 pub mod roles;
 pub mod routing;
+pub mod symlinks;
+pub mod validator;
 
 pub use config::{tool_policy_for_role, GovernanceConfig};
+pub use discovery::{AgentDiscovery, DiscoveredAgent};
 pub use guidance::{
     agent_role_from_state, apply_role_guidance, compose_guidance, load_manifest,
     role_system_prompt, RoleGuidance, CTX_AGENT_ROLE, CTX_GOVERNANCE_GUIDANCE,
@@ -47,6 +52,6 @@ pub use guidance::{
 pub use node::{GovernanceError, GovernanceNode};
 pub use parser::{blocks_for, parse_blocks, TaggedBlock};
 pub use roles::{AgentRole, RoleParseError};
-pub use routing::{
-    tool_policy_for_state, RoleHandoffNode, RoleRouterNode, RoleTargetRouterNode,
-};
+pub use routing::{tool_policy_for_state, RoleHandoffNode, RoleRouterNode, RoleTargetRouterNode};
+pub use symlinks::{SymlinkManager, SymlinkStatus, KNOWN_TARGETS};
+pub use validator::{ComplianceReport, GovernanceValidator};

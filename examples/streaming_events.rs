@@ -72,10 +72,17 @@ impl EventHandler for TimingHandler {
                 }
                 println!("⏱️  Started: {}", node_id);
             }
-            EventKind::Node(NodeEvent::Exited { node_id, duration_ms, .. }) => {
+            EventKind::Node(NodeEvent::Exited {
+                node_id,
+                duration_ms,
+                ..
+            }) => {
                 println!("✅ Finished: {} ({}ms)", node_id, duration_ms);
             }
-            EventKind::Graph(GraphEvent::Completed { iterations, duration_ms }) => {
+            EventKind::Graph(GraphEvent::Completed {
+                iterations,
+                duration_ms,
+            }) => {
                 println!("\n📊 Graph completed:");
                 println!("   Iterations: {}", iterations);
                 println!("   Total time: {}ms", duration_ms);
@@ -160,7 +167,10 @@ async fn main() -> anyhow::Result<()> {
 
     // Print final state
     println!("\n--- Final State ---");
-    println!("Items processed: {}", result.state().get_context::<i32>("processed").unwrap_or(0));
+    println!(
+        "Items processed: {}",
+        result.state().get_context::<i32>("processed").unwrap_or(0)
+    );
 
     // Cleanup
     drop(bus); // This will close the channel

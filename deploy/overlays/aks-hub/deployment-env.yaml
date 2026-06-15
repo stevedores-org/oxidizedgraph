@@ -1,0 +1,12 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: oxidizedgraph
+spec:
+  template:
+    spec:
+      containers:
+        - name: oxidizedgraph
+          env:
+            - name: WORKER_SPAWNER
+              value: k8s

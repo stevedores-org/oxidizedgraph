@@ -74,7 +74,10 @@ impl TracedRunner {
 
     /// Execute the graph and return state plus trace artifacts.
     #[instrument(skip(self, initial_state), fields(run_id = %self.run_context.run_id))]
-    pub async fn invoke(&self, mut initial_state: AgentState) -> Result<TracedRunResult, RuntimeError> {
+    pub async fn invoke(
+        &self,
+        mut initial_state: AgentState,
+    ) -> Result<TracedRunResult, RuntimeError> {
         attach_run_context(&mut initial_state, &self.run_context);
         if let Some(ref validator) = self.validator {
             validator
@@ -255,7 +258,7 @@ mod tests {
             .unwrap();
 
         let ctx = RunContext::with_ids("run-test", "thread-test");
-        let runner = TracedRunner::with_context(graph, ctx, RunnerConfig::default());
+        let runner = TracedRunner::with_context(Arc::new(graph), ctx, RunnerConfig::default());
         let result = runner.invoke(AgentState::new()).await.unwrap();
 
         assert_eq!(result.run_context.run_id, "run-test");

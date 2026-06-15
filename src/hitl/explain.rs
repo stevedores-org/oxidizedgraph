@@ -77,7 +77,8 @@ impl ReviewSummaryBuilder {
         let tool_actions: Vec<String> = state
             .get_context(CTX_RECENT_TOOL_ACTIONS)
             .unwrap_or_default();
-        let findings: Vec<ReviewFinding> = state.get_context(CTX_REVIEW_FINDINGS).unwrap_or_default();
+        let findings: Vec<ReviewFinding> =
+            state.get_context(CTX_REVIEW_FINDINGS).unwrap_or_default();
 
         ReviewSummary {
             summary,

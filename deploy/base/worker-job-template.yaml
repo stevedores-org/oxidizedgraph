@@ -1,0 +1,51 @@
+# Reference worker Job template for ADK agents (issue #41 / crossplane-heaven#4).
+#
+# oxidizedgraph spawns Jobs programmatically at runtime via the Kubernetes API.
+# This manifest documents the expected shape and is used by kubeconform in CI.
+# Replace ${...} placeholders when rendering for smoke tests.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  generateName: oxg-worker-
+  namespace: oxidizedgraph
+  labels:
+    app.kubernetes.io/name: oxidizedgraph-worker
+    app.kubernetes.io/part-of: stevedores
+    agent-build/managed-by: oxidizedgraph
+    agent-build/task-id: TASK_ID_PLACEHOLDER
+spec:
+  ttlSecondsAfterFinished: 3600
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: oxidizedgraph-worker
+        agent-build/managed-by: oxidizedgraph
+        agent-build/task-id: TASK_ID_PLACEHOLDER
+    spec:
+      restartPolicy: Never
+      serviceAccountName: oxidizedgraph-worker
+      containers:
+        - name: worker
+          image: ghcr.io/stevedores-org/oxidizedgraph/server:0.2.0
+          env:
+            - name: A2A_TASK_ID
+              value: TASK_ID_PLACEHOLDER
+            - name: A2A_CONTEXT_ID
+              value: CONTEXT_ID_PLACEHOLDER
+            - name: A2A_INPUT
+              value: ""
+            - name: ORCHESTRATOR_URL
+              value: http://oxidizedgraph:8080
+            - name: GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: github-app-token
+                  key: token
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi

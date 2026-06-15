@@ -30,10 +30,7 @@ pub struct RunTimeline {
 
 impl RunTimeline {
     /// Build a timeline from transition records and approval events.
-    pub fn from_artifacts(
-        transitions: &[TransitionRecord],
-        approvals: &[ApprovalEvent],
-    ) -> Self {
+    pub fn from_artifacts(transitions: &[TransitionRecord], approvals: &[ApprovalEvent]) -> Self {
         let mut entries = Vec::new();
         let mut seq = 0usize;
 
@@ -68,10 +65,7 @@ impl RunTimeline {
 
     /// Number of approval events in the timeline.
     pub fn approval_count(&self) -> usize {
-        self.entries
-            .iter()
-            .filter(|e| e.kind == "approval")
-            .count()
+        self.entries.iter().filter(|e| e.kind == "approval").count()
     }
 }
 

@@ -84,10 +84,7 @@ pub struct CrossRepoChangeGraph {
 
 impl CrossRepoChangeGraph {
     /// Create an empty change graph.
-    pub fn new(
-        objective_id: impl Into<String>,
-        run_id: impl Into<String>,
-    ) -> Self {
+    pub fn new(objective_id: impl Into<String>, run_id: impl Into<String>) -> Self {
         Self {
             objective_id: objective_id.into(),
             run_id: run_id.into(),

@@ -187,10 +187,14 @@ impl From<&EdgeType> for EdgeTypeTag {
 
 impl From<&GraphEdge> for EdgeShape {
     fn from(e: &GraphEdge) -> Self {
+        let transition_key = match &e.transition_key {
+            Some(k) if k == transitions::CONTINUE => None,
+            other => other.clone(),
+        };
         Self {
             from: e.from.clone(),
             to: e.to.clone(),
-            transition_key: e.transition_key.clone(),
+            transition_key,
             edge_type: EdgeTypeTag::from(&e.edge_type),
         }
     }
@@ -274,16 +278,20 @@ impl CompiledGraph {
     }
 }
 
+fn node_description(graph: &CompiledGraph, id: &str) -> Option<String> {
+    graph
+        .get_node(id)
+        .and_then(|n| n.executor.description())
+        .map(str::to_string)
+}
+
 fn diff_nodes(before: &CompiledGraph, after: &CompiledGraph) -> Vec<NodeChange> {
     let before_ids = user_node_ids(before);
     let after_ids = user_node_ids(after);
     let mut changes = Vec::new();
 
     for id in before_ids.difference(&after_ids) {
-        let description = before
-            .get_node(id)
-            .and_then(|n| n.executor.description())
-            .map(str::to_string);
+        let description = node_description(before, id);
         changes.push(NodeChange::Removed {
             id: id.clone(),
             description,
@@ -291,10 +299,7 @@ fn diff_nodes(before: &CompiledGraph, after: &CompiledGraph) -> Vec<NodeChange> 
     }
 
     for id in after_ids.difference(&before_ids) {
-        let description = after
-            .get_node(id)
-            .and_then(|n| n.executor.description())
-            .map(str::to_string);
+        let description = node_description(after, id);
         changes.push(NodeChange::Added {
             id: id.clone(),
             description,
@@ -302,14 +307,8 @@ fn diff_nodes(before: &CompiledGraph, after: &CompiledGraph) -> Vec<NodeChange> 
     }
 
     for id in before_ids.intersection(&after_ids) {
-        let b = before
-            .get_node(id)
-            .and_then(|n| n.executor.description())
-            .map(str::to_string);
-        let a = after
-            .get_node(id)
-            .and_then(|n| n.executor.description())
-            .map(str::to_string);
+        let b = node_description(before, id);
+        let a = node_description(after, id);
         if a != b {
             changes.push(NodeChange::DescriptionChanged {
                 id: id.clone(),
@@ -335,31 +334,31 @@ fn user_node_ids(graph: &CompiledGraph) -> BTreeSet<String> {
         .collect()
 }
 
-fn diff_edges(before: &[GraphEdge], after: &[GraphEdge]) -> Vec<EdgeChange> {
-    // Group edges by (from, transition_key) so we can detect "replaced":
-    // same source + transition key, different destination or kind. This
-    // mirrors the runtime's edge-lookup discipline in
-    // CompiledGraph::get_next_node_for_transition.
-    type Key = (String, Option<String>);
-    fn key_of(e: &GraphEdge) -> Key {
-        (e.from.clone(), e.transition_key.clone())
+fn group_by_key(edges: &[GraphEdge]) -> BTreeMap<(String, Option<String>), Vec<&GraphEdge>> {
+    let mut map: BTreeMap<(String, Option<String>), Vec<&GraphEdge>> = BTreeMap::new();
+    for e in edges {
+        if e.from == transitions::END || e.to == transitions::END {
+            continue;
+        }
+        let tk = match &e.transition_key {
+            Some(k) if k == transitions::CONTINUE => None,
+            other => other.clone(),
+        };
+        map.entry((e.from.clone(), tk)).or_default().push(e);
     }
+    map
+}
 
-    let mut before_map: BTreeMap<Key, Vec<&GraphEdge>> = BTreeMap::new();
-    for e in before {
-        before_map.entry(key_of(e)).or_default().push(e);
-    }
-    let mut after_map: BTreeMap<Key, Vec<&GraphEdge>> = BTreeMap::new();
-    for e in after {
-        after_map.entry(key_of(e)).or_default().push(e);
-    }
+fn diff_edges(before: &[GraphEdge], after: &[GraphEdge]) -> Vec<EdgeChange> {
+    let before_map = group_by_key(before);
+    let after_map = group_by_key(after);
 
     let mut changes = Vec::new();
-    let keys: BTreeSet<Key> = before_map.keys().chain(after_map.keys()).cloned().collect();
+    let keys: BTreeSet<_> = before_map.keys().chain(after_map.keys()).collect();
 
     for k in keys {
-        let bs = before_map.get(&k).map(Vec::as_slice).unwrap_or(&[]);
-        let as_ = after_map.get(&k).map(Vec::as_slice).unwrap_or(&[]);
+        let bs = before_map.get(k).map(Vec::as_slice).unwrap_or(&[]);
+        let as_ = after_map.get(k).map(Vec::as_slice).unwrap_or(&[]);
 
         match (bs.len(), as_.len()) {
             (0, _) => {
@@ -386,37 +385,51 @@ fn diff_edges(before: &[GraphEdge], after: &[GraphEdge]) -> Vec<EdgeChange> {
             }
             _ => {
                 // Multiple edges sharing the same (from, transition_key) is
-                // unusual but legal in the builder API. Fall back to a raw
-                // set diff so we don't silently coerce one into a `Replaced`
-                // pairing with an arbitrary partner.
-                let before_set: BTreeSet<EdgeShape> =
-                    bs.iter().map(|e| EdgeShape::from(*e)).collect();
-                let after_set: BTreeSet<EdgeShape> =
-                    as_.iter().map(|e| EdgeShape::from(*e)).collect();
-                for e in before_set.difference(&after_set) {
-                    changes.push(EdgeChange::Removed(e.clone()));
+                // unusual but legal in the builder API. Fall back to a count-aware
+                // multiset diff so we don't silently coerce one into a `Replaced`
+                // pairing with an arbitrary partner and don't drop multiplicity.
+                let mut before_counts = BTreeMap::new();
+                for e in bs {
+                    *before_counts.entry(EdgeShape::from(*e)).or_insert(0) += 1;
                 }
-                for e in after_set.difference(&before_set) {
-                    changes.push(EdgeChange::Added(e.clone()));
+                let mut after_counts = BTreeMap::new();
+                for e in as_ {
+                    *after_counts.entry(EdgeShape::from(*e)).or_insert(0) += 1;
+                }
+
+                let shapes: BTreeSet<&EdgeShape> =
+                    before_counts.keys().chain(after_counts.keys()).collect();
+                for shape in shapes {
+                    let b_count = before_counts.get(shape).copied().unwrap_or(0);
+                    let a_count = after_counts.get(shape).copied().unwrap_or(0);
+                    if b_count > a_count {
+                        for _ in 0..(b_count - a_count) {
+                            changes.push(EdgeChange::Removed(shape.clone()));
+                        }
+                    } else if a_count > b_count {
+                        for _ in 0..(a_count - b_count) {
+                            changes.push(EdgeChange::Added(shape.clone()));
+                        }
+                    }
                 }
             }
         }
     }
 
-    changes.sort_by_key(edge_change_sort_key);
+    changes.sort_by(|a, b| edge_change_sort_key_ref(a).cmp(&edge_change_sort_key_ref(b)));
     changes
 }
 
-fn edge_change_sort_key(e: &EdgeChange) -> (String, Option<String>, String) {
+fn edge_change_sort_key_ref(e: &EdgeChange) -> (&str, Option<&str>, &str) {
     match e {
         EdgeChange::Added(s) | EdgeChange::Removed(s) => {
-            (s.from.clone(), s.transition_key.clone(), s.to.clone())
+            (s.from.as_str(), s.transition_key.as_deref(), s.to.as_str())
         }
         EdgeChange::Replaced {
             from,
             transition_key,
             ..
-        } => (from.clone(), transition_key.clone(), String::new()),
+        } => (from.as_str(), transition_key.as_deref(), ""),
     }
 }
 
@@ -432,26 +445,10 @@ fn diff_metadata(
         return None;
     }
     Some(MetadataChange {
-        name_before: if name_changed {
-            before_name.cloned()
-        } else {
-            None
-        },
-        name_after: if name_changed {
-            after_name.cloned()
-        } else {
-            None
-        },
-        description_before: if desc_changed {
-            before_desc.cloned()
-        } else {
-            None
-        },
-        description_after: if desc_changed {
-            after_desc.cloned()
-        } else {
-            None
-        },
+        name_before: name_changed.then(|| before_name.cloned()).flatten(),
+        name_after: name_changed.then(|| after_name.cloned()).flatten(),
+        description_before: desc_changed.then(|| before_desc.cloned()).flatten(),
+        description_after: desc_changed.then(|| after_desc.cloned()).flatten(),
     })
 }
 
@@ -903,5 +900,116 @@ mod tests {
         // Re-serialize and compare strings; the type isn't PartialEq so this is
         // the simplest way to check round-trip determinism.
         assert_eq!(s, serde_json::to_string(&back).unwrap());
+    }
+
+    #[test]
+    fn synthetic_end_node_and_edges_are_filtered_from_diff() {
+        let before = build(
+            "g",
+            vec![StubNode {
+                id: "x",
+                description: None,
+            }],
+            vec![("x", transitions::END)],
+            "x",
+        );
+        let after = build(
+            "g",
+            vec![StubNode {
+                id: "x",
+                description: None,
+            }],
+            vec![("x", transitions::END)],
+            "x",
+        );
+        let d = before.diff(&after);
+        assert!(d.is_empty(), "expected empty diff, got {d:?}");
+    }
+
+    #[test]
+    fn default_transition_key_normalization() {
+        let mut before_builder = GraphBuilder::new()
+            .name("g")
+            .add_node(StubNode {
+                id: "x",
+                description: None,
+            })
+            .add_node(StubNode {
+                id: "y",
+                description: None,
+            });
+        // Add edge with None transition key
+        before_builder = before_builder.add_edge("x", "y");
+        let before_compiled = before_builder.set_entry_point("x").compile().unwrap();
+
+        let mut after_builder = GraphBuilder::new()
+            .name("g")
+            .add_node(StubNode {
+                id: "x",
+                description: None,
+            })
+            .add_node(StubNode {
+                id: "y",
+                description: None,
+            });
+        // Add edge with explicit "__continue__" key
+        after_builder = after_builder.add_edge_with_key("x", "y", transitions::CONTINUE);
+        let after_compiled = after_builder.set_entry_point("x").compile().unwrap();
+
+        let d = before_compiled.diff(&after_compiled);
+        assert!(
+            d.edge_changes.is_empty(),
+            "expected normalized transition keys to not yield differences: {:?}",
+            d.edge_changes
+        );
+    }
+
+    #[test]
+    fn multiset_diff_preserves_multiplicity() {
+        let before_compiled = GraphBuilder::new()
+            .name("g")
+            .add_node(StubNode {
+                id: "x",
+                description: None,
+            })
+            .add_node(StubNode {
+                id: "y",
+                description: None,
+            })
+            .add_edge("x", "y")
+            .add_edge("x", "y")
+            .set_entry_point("x")
+            .compile()
+            .unwrap();
+
+        let after_compiled = GraphBuilder::new()
+            .name("g")
+            .add_node(StubNode {
+                id: "x",
+                description: None,
+            })
+            .add_node(StubNode {
+                id: "y",
+                description: None,
+            })
+            .add_edge("x", "y")
+            .set_entry_point("x")
+            .compile()
+            .unwrap();
+
+        let d = before_compiled.diff(&after_compiled);
+        assert_eq!(
+            d.edge_changes.len(),
+            1,
+            "expected exactly 1 edge change, got {:?}",
+            d.edge_changes
+        );
+        match &d.edge_changes[0] {
+            EdgeChange::Removed(shape) => {
+                assert_eq!(shape.from, "x");
+                assert_eq!(shape.to, "y");
+            }
+            other => panic!("expected Removed edge change, got {:?}", other),
+        }
     }
 }

@@ -77,12 +77,17 @@ impl CiAggregator {
     }
 
     /// Build a consolidated report from raw CI signals.
-    pub fn aggregate(objective_id: impl Into<String>, signals: &[CiCheckSignal]) -> CiAggregateReport {
+    pub fn aggregate(
+        objective_id: impl Into<String>,
+        signals: &[CiCheckSignal],
+    ) -> CiAggregateReport {
         let objective_id = objective_id.into();
         let mut repo_status: HashMap<String, (bool, bool, bool)> = HashMap::new();
 
         for signal in signals {
-            let entry = repo_status.entry(signal.repo.clone()).or_insert((true, false, false));
+            let entry = repo_status
+                .entry(signal.repo.clone())
+                .or_insert((true, false, false));
             match signal.conclusion {
                 CiConclusion::Failure => {
                     entry.0 = false;

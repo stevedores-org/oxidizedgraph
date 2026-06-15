@@ -204,19 +204,15 @@ impl NodeExecutor for CompleteRepoChangeNode {
             .write()
             .map_err(|e| NodeError::execution_failed(e.to_string()))?;
 
-        let change_id: String = guard
-            .get_context(CTX_CURRENT_REPO_CHANGE)
-            .ok_or_else(|| NodeError::execution_failed("missing current_repo_change".to_string()))?;
+        let change_id: String = guard.get_context(CTX_CURRENT_REPO_CHANGE).ok_or_else(|| {
+            NodeError::execution_failed("missing current_repo_change".to_string())
+        })?;
 
         let mut graph: CrossRepoChangeGraph = guard
             .get_context(CTX_CHANGE_GRAPH)
             .ok_or_else(|| NodeError::execution_failed("missing change_graph".to_string()))?;
 
-        MultiRepoCoordinator::new().mark_status(
-            &mut graph,
-            &change_id,
-            RepoChangeStatus::CiPassed,
-        );
+        MultiRepoCoordinator::new().mark_status(&mut graph, &change_id, RepoChangeStatus::CiPassed);
         guard.set_context(CTX_CHANGE_GRAPH, graph);
         guard.remove_context(CTX_CURRENT_REPO_CHANGE);
 

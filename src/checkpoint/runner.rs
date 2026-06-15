@@ -21,7 +21,7 @@ pub enum RunResult {
     /// Execution was interrupted (human-in-the-loop)
     Interrupted {
         /// The checkpoint that was saved
-        checkpoint: Checkpoint,
+        checkpoint: Box<Checkpoint>,
         /// Reason for interruption
         reason: String,
     },
@@ -49,7 +49,7 @@ impl RunResult {
     /// Get the checkpoint if interrupted
     pub fn checkpoint(&self) -> Option<&Checkpoint> {
         match self {
-            RunResult::Interrupted { checkpoint, .. } => Some(checkpoint),
+            RunResult::Interrupted { checkpoint, .. } => Some(checkpoint.as_ref()),
             _ => None,
         }
     }
