@@ -57,6 +57,15 @@ pub use crate::guardrails::{
     QualityGateConfig, QualityGateNode, ReviewFinding, RiskClassifier, RiskLevel,
 };
 
+// Governance and role orchestration (roadmap EPIC2, issues #35/#36)
+pub use crate::governance::{
+    agent_role_from_state, apply_role_guidance, compose_guidance, load_manifest,
+    role_system_prompt, tool_policy_for_role, tool_policy_for_state, AgentRole, GovernanceConfig,
+    GovernanceError, GovernanceNode, RoleGuidance, RoleHandoffNode, RoleRouterNode,
+    RoleTargetRouterNode, CTX_AGENT_ROLE, CTX_GOVERNANCE_GUIDANCE, CTX_ROLE_SYSTEM_PROMPT,
+    CTX_TOOL_POLICY_ROLE,
+};
+
 // Built-in nodes
 pub use crate::nodes::{
     ConditionalNode, ContextRouterNode, DelayNode, EchoNode, FunctionNode, LLMConfig, LLMNode,
