@@ -78,9 +78,7 @@ impl Message {
     pub fn user_text(text: impl Into<String>) -> Self {
         Self {
             role: Role::RoleUser,
-            parts: vec![MessagePart {
-                text: text.into(),
-            }],
+            parts: vec![MessagePart { text: text.into() }],
             message_id: Uuid::new_v4().to_string(),
             task_id: None,
             context_id: None,

@@ -1,7 +1,9 @@
 //! Integration tests for issue #41 — A2A dispatch + ephemeral worker spawning.
 
 use oxidizedgraph::a2a::{self, AgentCard, JsonRpcRequest, TaskStore};
-use oxidizedgraph::worker::{MemoryWorkerSpawner, WorkerJobSpec, WorkerSpawner, WorkerSpawnerConfig};
+use oxidizedgraph::worker::{
+    MemoryWorkerSpawner, WorkerJobSpec, WorkerSpawner, WorkerSpawnerConfig,
+};
 
 #[tokio::test]
 async fn a2a_send_message_creates_working_task_with_job_name() {
@@ -55,7 +57,10 @@ async fn get_task_reflects_completed_worker_job() {
         }),
     };
     let sent = a2a::dispatch(send, &store, &spawner).await;
-    let task_id = sent.result.unwrap()["task"]["id"].as_str().unwrap().to_string();
+    let task_id = sent.result.unwrap()["task"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
     let job_name = store.get(&task_id).unwrap().worker_job.clone().unwrap();
 
     spawner.complete_job(&job_name);

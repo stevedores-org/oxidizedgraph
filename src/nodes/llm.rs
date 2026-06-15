@@ -191,17 +191,17 @@ impl<P: LLMProvider + 'static> NodeExecutor for LLMNode<P> {
             let guard = state
                 .read()
                 .map_err(|e| NodeError::execution_failed(e.to_string()))?;
-            
+
             let role_prompt = guard.get_context::<String>("role_system_prompt");
             let gov_guidance = guard.get_context::<String>("governance_guidance");
-            
+
             let ctx_prompt = match (role_prompt, gov_guidance) {
                 (Some(rp), Some(gg)) if !gg.is_empty() => Some(format!("{}\n\n{}", rp, gg)),
                 (Some(rp), _) => Some(rp),
                 (None, Some(gg)) if !gg.is_empty() => Some(gg),
                 _ => None,
             };
-            
+
             (guard.messages.clone(), ctx_prompt)
         };
 
@@ -379,16 +379,24 @@ mod tests {
         }
         #[async_trait]
         impl LLMProvider for CapturingProvider {
-            async fn generate(&self, _m: &[Message], c: &LLMConfig) -> Result<LLMResponse, NodeError> {
+            async fn generate(
+                &self,
+                _m: &[Message],
+                c: &LLMConfig,
+            ) -> Result<LLMResponse, NodeError> {
                 let mut guard = self.captured_prompt.lock().unwrap();
                 *guard = c.system_prompt.clone();
                 Ok(LLMResponse::text("Captured"))
             }
-            fn name(&self) -> &str { "capturing" }
+            fn name(&self) -> &str {
+                "capturing"
+            }
         }
 
         let captured = Arc::new(Mutex::new(None));
-        let provider = CapturingProvider { captured_prompt: captured.clone() };
+        let provider = CapturingProvider {
+            captured_prompt: captured.clone(),
+        };
         let config = LLMConfig::default().system_prompt("Base prompt");
         let node = LLMNode::new("llm", provider, config);
 

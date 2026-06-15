@@ -208,8 +208,14 @@ Empty tag line.
         assert!(result.is_err());
         if let Err(ValidationError::Manifest(errors)) = result {
             assert_eq!(errors.len(), 2);
-            assert!(matches!(errors[0], ManifestError::InvalidTag { line_number: 4, .. }));
-            assert!(matches!(errors[1], ManifestError::MalformedTagBoundary { line_number: 7, .. }));
+            assert!(matches!(
+                errors[0],
+                ManifestError::InvalidTag { line_number: 4, .. }
+            ));
+            assert!(matches!(
+                errors[1],
+                ManifestError::MalformedTagBoundary { line_number: 7, .. }
+            ));
         } else {
             panic!("Expected ValidationError::Manifest");
         }

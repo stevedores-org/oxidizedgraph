@@ -5,8 +5,8 @@
 //! 2. Build a workflow graph using role-based guidance, handoffs, routing, and tools.
 //! 3. Verify that role-scoped policies dynamically restrict tools (e.g. Architect cannot run shell tools, but Builder can).
 
-use std::sync::{Arc, RwLock};
 use oxidizedgraph::prelude::*;
+use std::sync::{Arc, RwLock};
 
 const MANIFEST: &str = "\
 <@all>
@@ -60,14 +60,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Build a graph that flows: gov (Architect) -> run plan -> try tool (denied) -> handoff (Builder) -> try tool (allowed)
     let graph = GraphBuilder::new()
         // Start under governance as Architect
-        .add_node(GovernanceNode::new("gov_init", MANIFEST, AgentRole::Architect))
+        .add_node(GovernanceNode::new(
+            "gov_init",
+            MANIFEST,
+            AgentRole::Architect,
+        ))
         // Try executing shell tool (this will be denied under Architect policy)
         .add_node(ToolNode::new("tools", registry))
         // Handoff to Builder role
-        .add_node(RoleHandoffNode::new("to_builder", MANIFEST, AgentRole::Builder))
+        .add_node(RoleHandoffNode::new(
+            "to_builder",
+            MANIFEST,
+            AgentRole::Builder,
+        ))
         // Complete node
         .add_node(StaticTransitionNode::to_end("done"))
-        
         .set_entry_point("gov_init")
         .add_edge("gov_init", "tools")
         .add_edge("tools", "to_builder")
@@ -84,10 +91,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ));
 
     let shared = Arc::new(RwLock::new(state));
-    
+
     // Execute up to 'to_builder'
     let runner = GraphRunner::new(graph.clone(), RunnerConfig::default());
-    
+
     println!("Running graph...");
     let final_state = runner.invoke_shared(shared).await?;
 

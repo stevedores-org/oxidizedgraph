@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use std::sync::Arc;
 
 use crate::error::NodeError;
-use crate::governance::{AgentRole, agent_role_from_state};
+use crate::governance::{agent_role_from_state, AgentRole};
 use crate::graph::{NodeExecutor, NodeOutput};
 use crate::state::{AgentState, SharedState};
 
@@ -181,11 +181,7 @@ impl BranchNode {
     }
 
     /// Add a branch that checks if the active agent role matches a specific role
-    pub fn branch_on_role(
-        self,
-        role: AgentRole,
-        target: impl Into<String>,
-    ) -> Self {
+    pub fn branch_on_role(self, role: AgentRole, target: impl Into<String>) -> Self {
         self.branch(
             move |state| {
                 agent_role_from_state(state)
@@ -315,7 +311,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_conditional_role_routing() {
-        let node = ConditionalNode::role_is("check", AgentRole::Builder, "build_target", "other_target");
+        let node =
+            ConditionalNode::role_is("check", AgentRole::Builder, "build_target", "other_target");
 
         // Role is builder -> true_target
         let mut state = AgentState::new();
