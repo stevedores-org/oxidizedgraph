@@ -186,16 +186,36 @@ impl<P: LLMProvider + 'static> NodeExecutor for LLMNode<P> {
     }
 
     async fn execute(&self, state: SharedState) -> Result<NodeOutput, NodeError> {
-        // Read messages from state
-        let messages = {
+        // Read messages and governance context from state
+        let (messages, context_prompt) = {
             let guard = state
                 .read()
                 .map_err(|e| NodeError::execution_failed(e.to_string()))?;
-            guard.messages.clone()
+            
+            let role_prompt = guard.get_context::<String>("role_system_prompt");
+            let gov_guidance = guard.get_context::<String>("governance_guidance");
+            
+            let ctx_prompt = match (role_prompt, gov_guidance) {
+                (Some(rp), Some(gg)) if !gg.is_empty() => Some(format!("{}\n\n{}", rp, gg)),
+                (Some(rp), _) => Some(rp),
+                (None, Some(gg)) if !gg.is_empty() => Some(gg),
+                _ => None,
+            };
+            
+            (guard.messages.clone(), ctx_prompt)
         };
 
+        let mut final_config = self.config.clone();
+        if let Some(cp) = context_prompt {
+            let new_prompt = match final_config.system_prompt {
+                Some(ref sp) => format!("{}\n\n{}", cp, sp),
+                None => cp,
+            };
+            final_config.system_prompt = Some(new_prompt);
+        }
+
         // Call the LLM
-        let response = self.provider.generate(&messages, &self.config).await?;
+        let response = self.provider.generate(&messages, &final_config).await?;
 
         // Update state with response
         {
@@ -349,5 +369,39 @@ mod tests {
         let guard = shared.read().unwrap();
         assert!(guard.tool_calls.is_empty());
         assert!(guard.is_complete);
+    }
+
+    #[tokio::test]
+    async fn test_llm_node_injects_governance_prompts() {
+        use std::sync::Mutex;
+        struct CapturingProvider {
+            captured_prompt: Arc<Mutex<Option<String>>>,
+        }
+        #[async_trait]
+        impl LLMProvider for CapturingProvider {
+            async fn generate(&self, _m: &[Message], c: &LLMConfig) -> Result<LLMResponse, NodeError> {
+                let mut guard = self.captured_prompt.lock().unwrap();
+                *guard = c.system_prompt.clone();
+                Ok(LLMResponse::text("Captured"))
+            }
+            fn name(&self) -> &str { "capturing" }
+        }
+
+        let captured = Arc::new(Mutex::new(None));
+        let provider = CapturingProvider { captured_prompt: captured.clone() };
+        let config = LLMConfig::default().system_prompt("Base prompt");
+        let node = LLMNode::new("llm", provider, config);
+
+        let mut state = AgentState::new();
+        state.set_context("role_system_prompt", "Role preamble".to_string());
+        state.set_context("governance_guidance", "Gov instructions".to_string());
+        let shared = Arc::new(RwLock::new(state));
+
+        let _ = node.execute(shared).await.unwrap();
+
+        let final_prompt = captured.lock().unwrap().clone().unwrap();
+        assert!(final_prompt.contains("Role preamble"));
+        assert!(final_prompt.contains("Gov instructions"));
+        assert!(final_prompt.contains("Base prompt"));
     }
 }

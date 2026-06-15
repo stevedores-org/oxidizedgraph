@@ -183,7 +183,6 @@ cargo run --example enterprise_workflow
 ## Delivery Phases
 
 All roadmap epics for #18 are implemented on `develop`.
->>>>>>> origin/develop
 
 ## North-Star KPIs
 
