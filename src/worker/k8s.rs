@@ -24,6 +24,7 @@ impl K8sWorkerSpawner {
     /// Connect using in-cluster config or `KUBECONFIG`.
     pub async fn connect(config: WorkerSpawnerConfig) -> Result<Self, WorkerError> {
         let client = Client::try_default()
+            .await
             .map_err(|e| WorkerError::Config(format!("kubernetes client: {e}")))?;
         Ok(Self { client, config })
     }

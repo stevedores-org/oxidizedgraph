@@ -6,6 +6,7 @@ use async_trait::async_trait;
 use std::sync::Arc;
 
 use crate::error::NodeError;
+use crate::governance::{AgentRole, agent_role_from_state};
 use crate::graph::{NodeExecutor, NodeOutput};
 use crate::state::{AgentState, SharedState};
 
@@ -82,6 +83,25 @@ impl ConditionalNode {
             false_target,
         )
     }
+
+    /// Create a conditional that checks if the active agent role matches a specific role
+    pub fn role_is(
+        id: impl Into<String>,
+        role: AgentRole,
+        true_target: impl Into<String>,
+        false_target: impl Into<String>,
+    ) -> Self {
+        Self::new(
+            id,
+            move |state| {
+                agent_role_from_state(state)
+                    .map(|r| r == role)
+                    .unwrap_or(false)
+            },
+            true_target,
+            false_target,
+        )
+    }
 }
 
 #[async_trait]
@@ -154,6 +174,22 @@ impl BranchNode {
                 state
                     .get_context::<T>(&key)
                     .map(|v| v == expected)
+                    .unwrap_or(false)
+            },
+            target,
+        )
+    }
+
+    /// Add a branch that checks if the active agent role matches a specific role
+    pub fn branch_on_role(
+        self,
+        role: AgentRole,
+        target: impl Into<String>,
+    ) -> Self {
+        self.branch(
+            move |state| {
+                agent_role_from_state(state)
+                    .map(|r| r == role)
                     .unwrap_or(false)
             },
             target,
@@ -275,5 +311,37 @@ mod tests {
         let shared = Arc::new(RwLock::new(state));
         let result = node.execute(shared).await.unwrap();
         assert_eq!(result.target(), Some("default"));
+    }
+
+    #[tokio::test]
+    async fn test_conditional_role_routing() {
+        let node = ConditionalNode::role_is("check", AgentRole::Builder, "build_target", "other_target");
+
+        // Role is builder -> true_target
+        let mut state = AgentState::new();
+        state.set_context("agent_role", "builder".to_string());
+        let shared = Arc::new(RwLock::new(state));
+        let result = node.execute(shared).await.unwrap();
+        assert_eq!(result.target(), Some("build_target"));
+
+        // Role is architect -> false_target
+        let mut state = AgentState::new();
+        state.set_context("agent_role", "architect".to_string());
+        let shared = Arc::new(RwLock::new(state));
+        let result = node.execute(shared).await.unwrap();
+        assert_eq!(result.target(), Some("other_target"));
+    }
+
+    #[tokio::test]
+    async fn test_branch_role_routing() {
+        let node = BranchNode::new("branch", "fallback")
+            .branch_on_role(AgentRole::Builder, "build")
+            .branch_on_role(AgentRole::Architect, "design");
+
+        let mut state = AgentState::new();
+        state.set_context("agent_role", "architect".to_string());
+        let shared = Arc::new(RwLock::new(state));
+        let result = node.execute(shared).await.unwrap();
+        assert_eq!(result.target(), Some("design"));
     }
 }

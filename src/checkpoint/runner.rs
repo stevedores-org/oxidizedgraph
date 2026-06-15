@@ -14,6 +14,7 @@ use crate::state::AgentState;
 
 /// Result of a checkpointing run
 #[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
 pub enum RunResult {
     /// Execution completed successfully
     Completed(AgentState),

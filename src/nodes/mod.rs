@@ -208,7 +208,7 @@ impl NodeExecutor for ContextRouterNode {
 }
 
 // Re-export commonly used types from submodules
-pub use conditional::ConditionalNode;
+pub use conditional::{BranchNode, ConditionalNode};
 pub use function::FunctionNode;
 pub use llm::{LLMConfig, LLMNode, LLMProvider};
 pub use quality_gate::{QualityGateConfig, QualityGateNode};

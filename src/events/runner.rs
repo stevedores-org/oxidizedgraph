@@ -15,6 +15,7 @@ use super::types::Event;
 
 /// Result of a streaming run
 #[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
 pub enum StreamingRunResult {
     /// Execution completed successfully
     Completed(AgentState),
