@@ -93,7 +93,6 @@ path = "examples/multirepo_cicd_workflow.rs"
 [[example]]
 name = "enterprise_workflow"
 path = "examples/enterprise_workflow.rs"
-
 [[bin]]
 name = "oxidizedgraph-server"
 path = "src/bin/server.rs"

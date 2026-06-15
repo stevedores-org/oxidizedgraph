@@ -58,7 +58,6 @@ let policy = tool_policy_for_role(&AgentRole::Architect);
 Quality gates use `RiskClassifier::approval_route` so medium-risk changes route to a `review` edge when checks pass.
 
 ## Phase 3 Baseline — EPIC6 Planning & Autonomy (Implemented)
-
 | Component | Module | Capabilities |
 |-----------|--------|--------------|
 | Plan model | `planning::plan` | `EpicPlan`, `Task`, `TaskStatus`, recovery injection |
@@ -181,6 +180,7 @@ cargo run --example enterprise_workflow
 ## Delivery Phases
 
 All roadmap epics for #18 are implemented on `develop`.
+>>>>>>> origin/develop
 
 ## North-Star KPIs
 
