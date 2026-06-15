@@ -81,6 +81,10 @@ path = "examples/planning_workflow.rs"
 name = "hitl_workflow"
 path = "examples/hitl_workflow.rs"
 
+[[example]]
+name = "memory_workflow"
+path = "examples/memory_workflow.rs"
+
 [[bin]]
 name = "oxidizedgraph-server"
 path = "src/bin/server.rs"
