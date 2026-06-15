@@ -11,10 +11,10 @@ use axum::{
     Router,
 };
 use clap::{Parser, Subcommand};
+use oxidizedgraph::a2a::{self, AgentCard, JsonRpcRequest, JsonRpcResponse, TaskStore};
 use oxidizedgraph::governance::{
     AgentDiscovery, GovernanceValidator, SymlinkManager, KNOWN_TARGETS,
 };
-use oxidizedgraph::a2a::{self, AgentCard, JsonRpcRequest, JsonRpcResponse, TaskStore};
 use oxidizedgraph::prelude::*;
 use oxidizedgraph::worker::{self, WorkerSpawner};
 use serde::{Deserialize, Serialize};
@@ -167,7 +167,7 @@ fn build_workflow() -> CompiledGraph {
                     (
                         guard
                             .get_context::<serde_json::Value>("input")
-                            .unwrap_or_else(|| serde_json::Value::Null),
+                            .unwrap_or(serde_json::Value::Null),
                         guard.get_context::<String>("run_id").unwrap_or_default(),
                         guard
                             .get_context::<String>("session_id")

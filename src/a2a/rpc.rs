@@ -120,10 +120,7 @@ pub async fn dispatch(
         "SendMessage" => handle_send_message(request.id, request.params, store, spawner).await,
         "GetTask" => handle_get_task(request.id, request.params, store, spawner).await,
         "CancelTask" => handle_cancel_task(request.id, request.params, store).await,
-        other => JsonRpcResponse::err(
-            request.id,
-            JsonRpcError::method_not_found(other),
-        ),
+        other => JsonRpcResponse::err(request.id, JsonRpcError::method_not_found(other)),
     }
 }
 
