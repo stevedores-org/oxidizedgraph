@@ -113,3 +113,7 @@ path = "src/bin/server.rs"
 [[bench]]
 name = "perf"
 harness = false
+
+[[bench]]
+name = "runtime"
+harness = false
