@@ -69,6 +69,10 @@ path = "examples/multi_agent.rs"
 name = "autonomous_dev_workflow"
 path = "examples/autonomous_dev_workflow.rs"
 
+[[example]]
+name = "role_orchestration_workflow"
+path = "examples/role_orchestration_workflow.rs"
+
 [[bin]]
 name = "oxidizedgraph-server"
 path = "src/bin/server.rs"
