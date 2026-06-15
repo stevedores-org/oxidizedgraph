@@ -527,7 +527,12 @@ impl ContextPacker {
         policy: &ContextPolicy,
     ) -> PackedContext {
         let budget = self.max_tokens.saturating_sub(self.reserved_tokens);
-        let mut sections = Vec::new();
+        let mut sections = Vec::with_capacity(
+            policy
+                .max_documents
+                .saturating_add(policy.max_episodes)
+                .saturating_add(policy.max_decisions),
+        );
         let mut estimated_tokens = 0;
         let mut truncated = false;
 

@@ -41,6 +41,7 @@ surrealdb = { version = "2", optional = true, features = ["kv-mem"] }
 [dev-dependencies]
 tokio-test = "0.4"
 mockall = "0.13"
+criterion = "0.5"
 
 [[example]]
 name = "simple_workflow"
@@ -96,3 +97,7 @@ path = "examples/enterprise_workflow.rs"
 [[bin]]
 name = "oxidizedgraph-server"
 path = "src/bin/server.rs"
+
+[[bench]]
+name = "perf"
+harness = false
