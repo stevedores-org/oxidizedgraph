@@ -7,8 +7,10 @@ mod node;
 mod plan;
 mod progress;
 mod scheduler;
+mod self_healing;
 
 pub use node::{PlanningNode, SchedulerNode};
 pub use plan::{EpicPlan, Task, TaskStatus};
 pub use progress::PlanProgress;
 pub use scheduler::Scheduler;
+pub use self_healing::{FailureClass, RetryPolicy, RecoveryRecord, classify_failure};
