@@ -89,6 +89,15 @@ pub use crate::hitl::{
     CTX_EXPLANATION, CTX_HITL_PAUSED,
 };
 
+// Multi-repo CI/CD orchestration (roadmap EPIC9)
+pub use crate::cicd::{
+    CiAggregateNode, CiAggregateReport, CiAggregator, CiCheckSignal, CiConclusion,
+    CompleteRepoChangeNode, CrossRepoChangeGraph, MultiRepoCoordinator,
+    MultiRepoCoordinatorNode, ReleaseBatch, ReleaseGateNode, ReleaseGateResult,
+    ReleaseOrchestrator, RepoChange, RepoChangeStatus, CTX_CHANGE_GRAPH, CTX_CI_AGGREGATE,
+    CTX_CURRENT_REPO_CHANGE, CTX_RELEASE_GATE,
+};
+
 // Built-in nodes
 pub use crate::nodes::tool::{AsyncFunctionTool, FunctionTool};
 pub use crate::nodes::{

@@ -85,6 +85,10 @@ path = "examples/hitl_workflow.rs"
 name = "memory_workflow"
 path = "examples/memory_workflow.rs"
 
+[[example]]
+name = "multirepo_cicd_workflow"
+path = "examples/multirepo_cicd_workflow.rs"
+
 [[bin]]
 name = "oxidizedgraph-server"
 path = "src/bin/server.rs"

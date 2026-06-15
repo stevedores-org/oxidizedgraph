@@ -115,6 +115,7 @@ cargo run --example hitl_workflow
 
 ```bash
 cargo run --example memory_workflow
+cargo run --example multirepo_cicd_workflow
 ```
 
 ### API Quick Reference
@@ -130,9 +131,24 @@ let store = AgentMemoryStore::new();
 let packed = ContextPacker::new(8_000).pack(&hits, &episodes, &decisions, &ContextPolicy::default());
 ```
 
+## Phase 3 Baseline — EPIC9 Multi-Repo CI/CD (Implemented)
+
+| Component | Module | Capabilities |
+|-----------|--------|--------------|
+| Change graph | `cicd::change_graph` | `CrossRepoChangeGraph`, `RepoChange` — dependency-aware multi-repo changes |
+| Coordinator | `cicd::coordinator` | `MultiRepoCoordinator` — ordered execution, failure propagation |
+| CI aggregation | `cicd::ci_aggregate` | `CiAggregator`, `CiAggregateReport` — objective-level CI consolidation |
+| Release gating | `cicd::release` | `ReleaseOrchestrator`, `ReleaseBatch` — blocks rollout on downstream breakage |
+| Graph nodes | `cicd::node` | `MultiRepoCoordinatorNode`, `CiAggregateNode`, `ReleaseGateNode` |
+
+### Example
+
+```bash
+cargo run --example multirepo_cicd_workflow
+```
+
 ## Delivery Phases (Remaining)
 
-- **Phase 3 (remaining)**: EPIC9 — multi-repo CI/CD
 - **Phase 4**: EPIC10 — enterprise hardening
 
 ## North-Star KPIs
@@ -151,6 +167,7 @@ let packed = ContextPacker::new(8_000).pack(&hits, &episodes, &decisions, &Conte
 - [#22](https://github.com/stevedores-org/oxidizedgraph/issues/22) — EPIC4 Code Quality Guardrails
 - [#24](https://github.com/stevedores-org/oxidizedgraph/issues/24) — EPIC6 Planning and Long-Horizon Autonomy
 - [#23](https://github.com/stevedores-org/oxidizedgraph/issues/23) — EPIC5 Memory, Context, and Retrieval
+- [#27](https://github.com/stevedores-org/oxidizedgraph/issues/27) — EPIC9 Multi-Repo and CI/CD Orchestration
 - [#26](https://github.com/stevedores-org/oxidizedgraph/issues/26) — EPIC8 Human-in-the-Loop Controls
 - [#35](https://github.com/stevedores-org/oxidizedgraph/issues/35) — GovernanceNode
 - [#36](https://github.com/stevedores-org/oxidizedgraph/issues/36) — Agent Role-Based Routing
