@@ -1,3 +1,5 @@
+//! Symlink management for governance manifest propagation.
+
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};

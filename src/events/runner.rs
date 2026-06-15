@@ -22,7 +22,7 @@ pub enum StreamingRunResult {
     /// Execution was interrupted (human-in-the-loop)
     Interrupted {
         /// The checkpoint that was saved
-        checkpoint: Checkpoint,
+        checkpoint: Box<Checkpoint>,
         /// Reason for interruption
         reason: String,
     },

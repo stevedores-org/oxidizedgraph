@@ -186,29 +186,16 @@ impl<P: LLMProvider + 'static> NodeExecutor for LLMNode<P> {
     }
 
     async fn execute(&self, state: SharedState) -> Result<NodeOutput, NodeError> {
-        // Read messages and role system prompt from state
-        let (messages, role_prompt) = {
+        // Read messages from state
+        let messages = {
             let guard = state
                 .read()
                 .map_err(|e| NodeError::execution_failed(e.to_string()))?;
-            (
-                guard.messages.clone(),
-                guard.get_context::<String>(crate::governance::CTX_ROLE_SYSTEM_PROMPT),
-            )
+            guard.messages.clone()
         };
 
-        // Inject role-based system prompt if available
-        let mut config = self.config.clone();
-        if let Some(prompt) = role_prompt {
-            if let Some(existing) = &config.system_prompt {
-                config.system_prompt = Some(format!("{}\n\n{}", prompt, existing));
-            } else {
-                config.system_prompt = Some(prompt);
-            }
-        }
-
         // Call the LLM
-        let response = self.provider.generate(&messages, &config).await?;
+        let response = self.provider.generate(&messages, &self.config).await?;
 
         // Update state with response
         {

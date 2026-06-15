@@ -12,18 +12,23 @@ use crate::error::RuntimeError;
 /// Stores checkpoints in memory. Data is lost when the process exits.
 /// For production, use `SurrealCheckpointer` with the `persistence` feature.
 pub struct MemoryCheckpointer {
+    /// Shared checkpoint store.
+    store: RwLock<CheckpointStore>,
+}
+
+#[derive(Default)]
+struct CheckpointStore {
     /// Checkpoints indexed by ID
-    checkpoints: RwLock<HashMap<String, Checkpoint>>,
+    checkpoints: HashMap<String, Checkpoint>,
     /// Thread ID to checkpoint IDs mapping (ordered by creation time)
-    threads: RwLock<HashMap<String, Vec<String>>>,
+    threads: HashMap<String, Vec<String>>,
 }
 
 impl MemoryCheckpointer {
     /// Create a new in-memory checkpointer
     pub fn new() -> Self {
         Self {
-            checkpoints: RwLock::new(HashMap::new()),
-            threads: RwLock::new(HashMap::new()),
+            store: RwLock::new(CheckpointStore::default()),
         }
     }
 }
@@ -40,34 +45,23 @@ impl Checkpointer for MemoryCheckpointer {
         let id = checkpoint.id.clone();
         let thread_id = checkpoint.thread_id.clone();
 
-        // Store the checkpoint
-        {
-            let mut checkpoints = self
-                .checkpoints
-                .write()
-                .map_err(|e| RuntimeError::InvalidState(e.to_string()))?;
-            checkpoints.insert(id.clone(), checkpoint);
-        }
-
-        // Update thread index
-        {
-            let mut threads = self
-                .threads
-                .write()
-                .map_err(|e| RuntimeError::InvalidState(e.to_string()))?;
-            threads.entry(thread_id).or_default().push(id);
-        }
+        let mut store = self
+            .store
+            .write()
+            .map_err(|e| RuntimeError::InvalidState(e.to_string()))?;
+        store.checkpoints.insert(id.clone(), checkpoint);
+        store.threads.entry(thread_id).or_default().push(id);
 
         Ok(())
     }
 
     async fn load(&self, thread_id: &str) -> Result<Option<Checkpoint>, RuntimeError> {
-        let threads = self
-            .threads
+        let store = self
+            .store
             .read()
             .map_err(|e| RuntimeError::InvalidState(e.to_string()))?;
 
-        let checkpoint_ids = match threads.get(thread_id) {
+        let checkpoint_ids = match store.threads.get(thread_id) {
             Some(ids) => ids,
             None => return Ok(None),
         };
@@ -77,65 +71,47 @@ impl Checkpointer for MemoryCheckpointer {
             None => return Ok(None),
         };
 
-        let checkpoints = self
-            .checkpoints
-            .read()
-            .map_err(|e| RuntimeError::InvalidState(e.to_string()))?;
-
-        Ok(checkpoints.get(latest_id).cloned())
+        Ok(store.checkpoints.get(latest_id).cloned())
     }
 
     async fn load_by_id(&self, checkpoint_id: &str) -> Result<Option<Checkpoint>, RuntimeError> {
-        let checkpoints = self
-            .checkpoints
+        let store = self
+            .store
             .read()
             .map_err(|e| RuntimeError::InvalidState(e.to_string()))?;
 
-        Ok(checkpoints.get(checkpoint_id).cloned())
+        Ok(store.checkpoints.get(checkpoint_id).cloned())
     }
 
     async fn list(&self, thread_id: &str) -> Result<Vec<Checkpoint>, RuntimeError> {
-        let threads = self
-            .threads
+        let store = self
+            .store
             .read()
             .map_err(|e| RuntimeError::InvalidState(e.to_string()))?;
 
-        let checkpoint_ids = match threads.get(thread_id) {
+        let checkpoint_ids = match store.threads.get(thread_id) {
             Some(ids) => ids.clone(),
             None => return Ok(Vec::new()),
         };
-
-        let checkpoints = self
-            .checkpoints
-            .read()
-            .map_err(|e| RuntimeError::InvalidState(e.to_string()))?;
 
         // Return in reverse order (newest first)
         let result: Vec<Checkpoint> = checkpoint_ids
             .iter()
             .rev()
-            .filter_map(|id| checkpoints.get(id).cloned())
+            .filter_map(|id| store.checkpoints.get(id).cloned())
             .collect();
 
         Ok(result)
     }
 
     async fn delete(&self, checkpoint_id: &str) -> Result<(), RuntimeError> {
-        let checkpoint = {
-            let mut checkpoints = self
-                .checkpoints
-                .write()
-                .map_err(|e| RuntimeError::InvalidState(e.to_string()))?;
-            checkpoints.remove(checkpoint_id)
-        };
+        let mut store = self
+            .store
+            .write()
+            .map_err(|e| RuntimeError::InvalidState(e.to_string()))?;
 
-        if let Some(cp) = checkpoint {
-            let mut threads = self
-                .threads
-                .write()
-                .map_err(|e| RuntimeError::InvalidState(e.to_string()))?;
-
-            if let Some(ids) = threads.get_mut(&cp.thread_id) {
+        if let Some(cp) = store.checkpoints.remove(checkpoint_id) {
+            if let Some(ids) = store.threads.get_mut(&cp.thread_id) {
                 ids.retain(|id| id != checkpoint_id);
             }
         }
@@ -144,23 +120,14 @@ impl Checkpointer for MemoryCheckpointer {
     }
 
     async fn delete_thread(&self, thread_id: &str) -> Result<(), RuntimeError> {
-        let checkpoint_ids = {
-            let mut threads = self
-                .threads
-                .write()
-                .map_err(|e| RuntimeError::InvalidState(e.to_string()))?;
-            threads.remove(thread_id).unwrap_or_default()
-        };
+        let mut store = self
+            .store
+            .write()
+            .map_err(|e| RuntimeError::InvalidState(e.to_string()))?;
 
-        {
-            let mut checkpoints = self
-                .checkpoints
-                .write()
-                .map_err(|e| RuntimeError::InvalidState(e.to_string()))?;
-
-            for id in checkpoint_ids {
-                checkpoints.remove(&id);
-            }
+        let checkpoint_ids = store.threads.remove(thread_id).unwrap_or_default();
+        for id in checkpoint_ids {
+            store.checkpoints.remove(&id);
         }
 
         Ok(())

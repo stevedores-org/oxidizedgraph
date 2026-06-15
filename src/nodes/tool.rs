@@ -264,9 +264,6 @@ impl NodeExecutor for ToolNode {
             return Ok(NodeOutput::cont());
         }
 
-        // Determine which policy engine to use
-        // 1. If the node has an explicitly configured policy, use it
-        // 2. Otherwise, check state for dynamic policy
         let dynamic_engine;
         let policy_to_use = if let Some(ref config_policy) = self.config.policy {
             Some(config_policy)

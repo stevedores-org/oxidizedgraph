@@ -45,7 +45,7 @@ fn test_governance_validation() {
     // Fix it
     fs::write(base.join("AGENTS.md"), "Master").unwrap();
 
-    let mut mgr = oxidizedgraph::governance::SymlinkManager::default(base);
+    let mgr = oxidizedgraph::governance::SymlinkManager::default(base);
     mgr.sync_all().unwrap();
 
     let report2 = validator.validate_compliance();

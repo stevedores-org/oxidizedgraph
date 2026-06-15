@@ -1,4 +1,4 @@
-use oxidizedgraph::governance::{SymlinkManager, SymlinkStatus, KNOWN_TARGETS};
+use oxidizedgraph::governance::{SymlinkManager, SymlinkStatus};
 use oxidizedgraph::prelude::*;
 use std::fs;
 use tempfile::tempdir;
@@ -41,7 +41,7 @@ fn test_symlink_creation_and_validation() {
 async fn test_governance_node_enforces_rules_in_tool_node() {
     // This integration test verifies that tool nodes respect the governance rule
     // Builder should be able to run safe tools but not forbidden ones if policy denies it
-    use oxidizedgraph::tools::policy::{ToolExecutionPolicy, ToolPolicyEngine};
+    use oxidizedgraph::tools::policy::ToolExecutionPolicy;
 
     let mut state = AgentState::new();
     // Simulate setting a policy in state (which GovernanceNode would do)

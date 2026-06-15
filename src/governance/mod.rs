@@ -7,6 +7,7 @@
 //! - [`GovernanceNode`] for applying manifest guidance to [`AgentState`]
 //! - Role routing primitives ([`RoleRouterNode`], [`RoleHandoffNode`])
 //! - Per-role tool restrictions via [`tool_policy_for_role`]
+//! - Symlink sync, agent discovery, and compliance validation (Epic #30)
 //!
 //! [issue]: https://github.com/stevedores-org/oxidizedgraph/issues/31
 //! [roadmap]: https://github.com/stevedores-org/oxidizedgraph/issues/18

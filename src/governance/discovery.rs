@@ -1,3 +1,5 @@
+//! Discover agent manifests and role metadata in a repository tree.
+
 use crate::governance::roles::AgentRole;
 use std::fs;
 use std::path::PathBuf;

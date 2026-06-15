@@ -1,3 +1,5 @@
+//! Compliance validation against governance symlink and manifest rules.
+
 use crate::governance::symlinks::{SymlinkManager, SymlinkStatus, KNOWN_TARGETS};
 use std::path::PathBuf;
 
