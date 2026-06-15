@@ -92,7 +92,9 @@ impl SurrealCheckpointerBuilder {
         db.use_ns(&self.namespace)
             .use_db(&self.database)
             .await
-            .map_err(|e| RuntimeError::InvalidState(format!("SurrealDB use ns/db failed: {}", e)))?;
+            .map_err(|e| {
+                RuntimeError::InvalidState(format!("SurrealDB use ns/db failed: {}", e))
+            })?;
 
         let checkpointer = SurrealCheckpointer { db };
         checkpointer.setup_schema().await?;
@@ -141,8 +143,9 @@ impl TryFrom<CheckpointRecord> for Checkpoint {
     type Error = RuntimeError;
 
     fn try_from(record: CheckpointRecord) -> Result<Self, Self::Error> {
-        let state = serde_json::from_value(record.state)
-            .map_err(|e| RuntimeError::InvalidState(format!("Failed to deserialize state: {}", e)))?;
+        let state = serde_json::from_value(record.state).map_err(|e| {
+            RuntimeError::InvalidState(format!("Failed to deserialize state: {}", e))
+        })?;
 
         let created_at = chrono::DateTime::parse_from_rfc3339(&record.created_at)
             .map_err(|e| RuntimeError::InvalidState(format!("Failed to parse timestamp: {}", e)))?
@@ -170,7 +173,9 @@ impl SurrealCheckpointer {
         db.use_ns("oxidizedgraph")
             .use_db("checkpoints")
             .await
-            .map_err(|e| RuntimeError::InvalidState(format!("SurrealDB use ns/db failed: {}", e)))?;
+            .map_err(|e| {
+                RuntimeError::InvalidState(format!("SurrealDB use ns/db failed: {}", e))
+            })?;
 
         let checkpointer = Self { db };
         checkpointer.setup_schema().await?;
@@ -188,7 +193,9 @@ impl SurrealCheckpointer {
         db.use_ns("oxidizedgraph")
             .use_db("checkpoints")
             .await
-            .map_err(|e| RuntimeError::InvalidState(format!("SurrealDB use ns/db failed: {}", e)))?;
+            .map_err(|e| {
+                RuntimeError::InvalidState(format!("SurrealDB use ns/db failed: {}", e))
+            })?;
 
         let checkpointer = Self { db };
         checkpointer.setup_schema().await?;
@@ -230,7 +237,8 @@ impl Checkpointer for SurrealCheckpointer {
         let record: CheckpointRecord = checkpoint.into();
 
         // Use create with the record's checkpoint_id as the record ID
-        let _: Option<CheckpointRecord> = self.db
+        let _: Option<CheckpointRecord> = self
+            .db
             .create(("checkpoints", record.checkpoint_id.clone()))
             .content(record)
             .await
@@ -259,7 +267,8 @@ impl Checkpointer for SurrealCheckpointer {
     }
 
     async fn load_by_id(&self, checkpoint_id: &str) -> Result<Option<Checkpoint>, RuntimeError> {
-        let record: Option<CheckpointRecord> = self.db
+        let record: Option<CheckpointRecord> = self
+            .db
             .select(("checkpoints", checkpoint_id))
             .await
             .map_err(|e| RuntimeError::InvalidState(format!("Failed to load checkpoint: {}", e)))?;
@@ -274,10 +283,14 @@ impl Checkpointer for SurrealCheckpointer {
         let thread_id = thread_id.to_string();
         let mut result = self
             .db
-            .query("SELECT * FROM checkpoints WHERE thread_id = $thread_id ORDER BY created_at DESC")
+            .query(
+                "SELECT * FROM checkpoints WHERE thread_id = $thread_id ORDER BY created_at DESC",
+            )
             .bind(("thread_id", thread_id))
             .await
-            .map_err(|e| RuntimeError::InvalidState(format!("Failed to list checkpoints: {}", e)))?;
+            .map_err(|e| {
+                RuntimeError::InvalidState(format!("Failed to list checkpoints: {}", e))
+            })?;
 
         let records: Vec<CheckpointRecord> = result
             .take(0)
@@ -287,10 +300,13 @@ impl Checkpointer for SurrealCheckpointer {
     }
 
     async fn delete(&self, checkpoint_id: &str) -> Result<(), RuntimeError> {
-        let _: Option<CheckpointRecord> = self.db
+        let _: Option<CheckpointRecord> = self
+            .db
             .delete(("checkpoints", checkpoint_id))
             .await
-            .map_err(|e| RuntimeError::InvalidState(format!("Failed to delete checkpoint: {}", e)))?;
+            .map_err(|e| {
+                RuntimeError::InvalidState(format!("Failed to delete checkpoint: {}", e))
+            })?;
 
         Ok(())
     }

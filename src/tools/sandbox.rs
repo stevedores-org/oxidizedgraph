@@ -145,7 +145,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_subprocess_sandbox_timeout() {
-        let sandbox = SubprocessSandbox::new(SandboxConfig::with_timeout(Duration::from_millis(50)));
+        let sandbox =
+            SubprocessSandbox::new(SandboxConfig::with_timeout(Duration::from_millis(50)));
         let result = sandbox.run("sleep 2", None).await;
         assert!(matches!(result, Err(SandboxError::Timeout(_))));
     }

@@ -150,9 +150,7 @@ mod tests {
     fn sample_graph() -> CrossRepoChangeGraph {
         let mut graph = CrossRepoChangeGraph::new("issue-27", "run-1");
         graph.add_change(RepoChange::new("infra", "org/infra", "Publish module"));
-        graph.add_change(
-            RepoChange::new("lib", "org/lib", "Bump dependency").depends_on("infra"),
-        );
+        graph.add_change(RepoChange::new("lib", "org/lib", "Bump dependency").depends_on("infra"));
         graph.add_change(RepoChange::new("app", "org/app", "Deploy").depends_on("lib"));
         graph
     }
@@ -174,7 +172,13 @@ mod tests {
         coordinator.mark_status(&mut graph, "infra", RepoChangeStatus::CiFailed);
 
         assert!(coordinator.has_rollout_failure(&graph));
-        assert_eq!(graph.get_change("lib").unwrap().status, RepoChangeStatus::Blocked);
-        assert_eq!(graph.get_change("app").unwrap().status, RepoChangeStatus::Blocked);
+        assert_eq!(
+            graph.get_change("lib").unwrap().status,
+            RepoChangeStatus::Blocked
+        );
+        assert_eq!(
+            graph.get_change("app").unwrap().status,
+            RepoChangeStatus::Blocked
+        );
     }
 }

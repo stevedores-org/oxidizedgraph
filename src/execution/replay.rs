@@ -110,8 +110,8 @@ pub fn output_from_record(record: &TransitionRecord) -> NodeOutput {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::transition::TransitionRecord;
+    use super::*;
 
     #[test]
     fn test_output_from_record_preserves_transition_key() {

@@ -7,11 +7,11 @@ use crate::graph::{NodeExecutor, NodeOutput};
 use crate::guardrails::RiskLevel;
 use crate::state::SharedState;
 
+use super::explain::ReviewSummaryBuilder;
 use super::policy::{ApprovalAction, ApprovalPolicy};
 use super::types::{
     append_approval_event, ApprovalDecision, ApprovalEvent, ApprovalRequest, ApprovalStatus,
-    ExplanationPayload, CTX_APPROVAL_DECISION, CTX_APPROVAL_REQUEST, CTX_EXPLANATION,
-    CTX_HITL_PAUSED,
+    CTX_APPROVAL_DECISION, CTX_APPROVAL_REQUEST, CTX_EXPLANATION, CTX_HITL_PAUSED,
 };
 
 /// Pauses execution when policy requires human approval for the current risk level.
@@ -66,12 +66,11 @@ impl NodeExecutor for ApprovalCheckpointNode {
         match action {
             ApprovalAction::Allow => Ok(NodeOutput::transition("approved")),
             ApprovalAction::Deny => {
-                let request =
-                    ApprovalRequest::new("Policy denied action", risk).with_summary(
-                        guard
-                            .get_context::<String>("change_summary")
-                            .unwrap_or_default(),
-                    );
+                let request = ApprovalRequest::new("Policy denied action", risk).with_summary(
+                    guard
+                        .get_context::<String>("change_summary")
+                        .unwrap_or_default(),
+                );
                 append_approval_event(&mut guard, ApprovalEvent::checkpoint_created(&request));
                 guard.set_context(CTX_APPROVAL_REQUEST, request);
                 guard.set_context(CTX_HITL_PAUSED, true);
@@ -81,16 +80,14 @@ impl NodeExecutor for ApprovalCheckpointNode {
                 let summary = guard
                     .get_context::<String>("change_summary")
                     .unwrap_or_else(|| "Autonomous change pending review".to_string());
-                let request = ApprovalRequest::new(
-                    format!("{risk:?} change requires human approval"),
-                    risk,
-                )
-                .with_summary(&summary);
+                let request =
+                    ApprovalRequest::new(format!("{risk:?} change requires human approval"), risk)
+                        .with_summary(&summary);
 
-                let explanation = ExplanationPayload::new(
-                    summary,
-                    format!("Risk level {risk:?} matched pause policy"),
-                );
+                let summarizer = ReviewSummaryBuilder::new();
+                let review = summarizer
+                    .from_state(&guard, format!("Risk level {risk:?} matched pause policy"));
+                let explanation = summarizer.to_explanation(&review);
                 append_approval_event(&mut guard, ApprovalEvent::checkpoint_created(&request));
                 guard.set_context(CTX_APPROVAL_REQUEST, request);
                 guard.set_context(CTX_EXPLANATION, explanation);
@@ -141,9 +138,10 @@ impl NodeExecutor for GrantApprovalNode {
             .write()
             .map_err(|e| NodeError::execution_failed(e.to_string()))?;
 
-        let request: ApprovalRequest = guard.get_context(CTX_APPROVAL_REQUEST).ok_or_else(|| {
-            NodeError::execution_failed("no approval_request in context".to_string())
-        })?;
+        let request: ApprovalRequest =
+            guard.get_context(CTX_APPROVAL_REQUEST).ok_or_else(|| {
+                NodeError::execution_failed("no approval_request in context".to_string())
+            })?;
 
         let mut decision = ApprovalDecision::approve(&request.id, &self.approver);
         decision.rationale = self.rationale.clone();
@@ -157,6 +155,39 @@ impl NodeExecutor for GrantApprovalNode {
 
     fn description(&self) -> Option<&str> {
         Some("Records operator approval and resumes the workflow")
+    }
+}
+
+/// Applies queued operator edits before resuming execution.
+#[derive(Clone, Debug, Default)]
+pub struct EditInterventionNode {
+    id: String,
+}
+
+impl EditInterventionNode {
+    /// Create an edit intervention node.
+    pub fn new(id: impl Into<String>) -> Self {
+        Self { id: id.into() }
+    }
+}
+
+#[async_trait]
+impl NodeExecutor for EditInterventionNode {
+    fn id(&self) -> &str {
+        &self.id
+    }
+
+    async fn execute(&self, state: SharedState) -> Result<NodeOutput, NodeError> {
+        let mut guard = state
+            .write()
+            .map_err(|e| NodeError::execution_failed(e.to_string()))?;
+
+        super::intervention::HitlController::apply_edits(&mut guard);
+        Ok(NodeOutput::cont())
+    }
+
+    fn description(&self) -> Option<&str> {
+        Some("Applies operator context edits queued during HITL pause")
     }
 }
 
@@ -211,7 +242,9 @@ mod tests {
 
         let guard = shared.read().unwrap();
         assert!(guard.get_context::<bool>(CTX_HITL_PAUSED).unwrap());
-        assert!(guard.get_context::<ApprovalRequest>(CTX_APPROVAL_REQUEST).is_some());
+        assert!(guard
+            .get_context::<ApprovalRequest>(CTX_APPROVAL_REQUEST)
+            .is_some());
     }
 
     #[tokio::test]
@@ -226,7 +259,9 @@ mod tests {
         grant.execute(shared.clone()).await.unwrap();
 
         let guard = shared.read().unwrap();
-        let decision = guard.get_context::<ApprovalDecision>(CTX_APPROVAL_DECISION).unwrap();
+        let decision = guard
+            .get_context::<ApprovalDecision>(CTX_APPROVAL_DECISION)
+            .unwrap();
         assert_eq!(decision.status, ApprovalStatus::Approved);
         assert!(!guard.get_context::<bool>(CTX_HITL_PAUSED).unwrap());
     }

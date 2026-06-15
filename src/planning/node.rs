@@ -7,7 +7,7 @@ use crate::graph::{NodeExecutor, NodeOutput};
 use crate::planning::plan::{EpicPlan, Task, TaskStatus};
 use crate::planning::progress::PlanProgress;
 use crate::planning::scheduler::Scheduler;
-use crate::planning::self_healing::{FailureClass, RetryPolicy, RecoveryRecord, classify_failure};
+use crate::planning::self_healing::{classify_failure, FailureClass, RecoveryRecord, RetryPolicy};
 use crate::state::SharedState;
 
 /// Type alias for the goal decomposer closure.
@@ -162,26 +162,33 @@ impl NodeExecutor for SchedulerNode {
         }
 
         if has_failures {
-            let mut attempts: HashMap<String, usize> = guard.get_context("task_attempts").unwrap_or_default();
-            let mut history: Vec<RecoveryRecord> = guard.get_context("recovery_history").unwrap_or_default();
+            let mut attempts: HashMap<String, usize> =
+                guard.get_context("task_attempts").unwrap_or_default();
+            let mut history: Vec<RecoveryRecord> =
+                guard.get_context("recovery_history").unwrap_or_default();
             let mut replanned_all = true;
             let mut replanned_any = false;
 
             for failed_id in failed_ids {
                 let task = plan.get_task(&failed_id).unwrap().clone();
-                let error_msg = task.error.clone().unwrap_or_else(|| "Unknown error".to_string());
+                let error_msg = task
+                    .error
+                    .clone()
+                    .unwrap_or_else(|| "Unknown error".to_string());
 
                 if self.self_healing_enabled {
                     let class = classify_failure(&error_msg);
-                    let policy = self.retry_policies.get(&class).cloned().unwrap_or_else(|| {
-                        match class {
-                            FailureClass::Compile => RetryPolicy::compile_default(),
-                            FailureClass::Test => RetryPolicy::test_default(),
-                            FailureClass::Runtime => RetryPolicy::runtime_default(),
-                            FailureClass::Integration => RetryPolicy::integration_default(),
-                            FailureClass::Unknown => RetryPolicy::default(),
-                        }
-                    });
+                    let policy =
+                        self.retry_policies
+                            .get(&class)
+                            .cloned()
+                            .unwrap_or_else(|| match class {
+                                FailureClass::Compile => RetryPolicy::compile_default(),
+                                FailureClass::Test => RetryPolicy::test_default(),
+                                FailureClass::Runtime => RetryPolicy::runtime_default(),
+                                FailureClass::Integration => RetryPolicy::integration_default(),
+                                FailureClass::Unknown => RetryPolicy::default(),
+                            });
 
                     let current_attempts = *attempts.get(&failed_id).unwrap_or(&0);
 
@@ -190,11 +197,14 @@ impl NodeExecutor for SchedulerNode {
                         attempts.insert(failed_id.clone(), attempt);
 
                         // If a manual recovery is registered, use it, else generate dynamically
-                        let recovery = if let Some(manual_rec) = self.auto_replan_recoveries.get(&failed_id).cloned() {
+                        let recovery = if let Some(manual_rec) =
+                            self.auto_replan_recoveries.get(&failed_id).cloned()
+                        {
                             manual_rec
                         } else {
                             let rec_id = format!("recovery_{}_{}", failed_id, attempt);
-                            let rec_name = format!("Remediate {} failure in {}", class.as_str(), task.name);
+                            let rec_name =
+                                format!("Remediate {} failure in {}", class.as_str(), task.name);
                             let rec_desc = format!(
                                 "Self-healing task injected for {} (Attempt {}/{}) due to: {}",
                                 task.id, attempt, policy.max_attempts, error_msg
@@ -211,7 +221,7 @@ impl NodeExecutor for SchedulerNode {
                             format!(
                                 "Classified as {:?}. Injected recovery task {}/{} attempts.",
                                 class, attempt, policy.max_attempts
-                            )
+                            ),
                         );
                         history.push(record);
 
@@ -237,7 +247,7 @@ impl NodeExecutor for SchedulerNode {
                             format!(
                                 "Exceeded max attempts ({}) for failure class {:?}",
                                 policy.max_attempts, class
-                            )
+                            ),
                         );
                         history.push(record);
 

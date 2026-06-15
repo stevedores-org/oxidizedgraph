@@ -58,7 +58,6 @@ let policy = tool_policy_for_role(&AgentRole::Architect);
 Quality gates use `RiskClassifier::approval_route` so medium-risk changes route to a `review` edge when checks pass.
 
 ## Phase 3 Baseline — EPIC6 Planning & Autonomy (Implemented)
-
 | Component | Module | Capabilities |
 |-----------|--------|--------------|
 | Plan model | `planning::plan` | `EpicPlan`, `Task`, `TaskStatus`, recovery injection |
@@ -93,8 +92,11 @@ let progress = PlanProgress::calculate(&plan);
 |-----------|--------|--------------|
 | Approval policy | `hitl::policy` | `ApprovalMatrix`, `ApprovalPolicy` — risk class → pause/allow/deny |
 | Checkpoint types | `hitl::types` | `ApprovalRequest`, `ApprovalDecision`, `ExplanationPayload`, immutable `ApprovalEvent` audit log |
-| Graph nodes | `hitl::node` | `ApprovalCheckpointNode`, `GrantApprovalNode`, `ResumeNode` |
+| Graph nodes | `hitl::node` | `ApprovalCheckpointNode`, `GrantApprovalNode`, `EditInterventionNode`, `ResumeNode` |
+| Intervention API | `hitl::intervention` | `HitlController` — pause, edit, approve, deny, resume without state loss |
+| Review summaries | `hitl::explain` | `ReviewSummaryBuilder` — diff hints, tool actions, findings for operator review |
 | Operator timeline | `hitl::timeline` | `RunTimeline` merges transition log + approval events |
+| Server hooks | `oxidizedgraph-server` | `/api/v1/sessions/{id}/hitl/*` — status, pause, edit, approve, deny, timeline |
 
 ### Example
 
@@ -181,6 +183,7 @@ cargo run --example enterprise_workflow
 ## Delivery Phases
 
 All roadmap epics for #18 are implemented on `develop`.
+>>>>>>> origin/develop
 
 ## North-Star KPIs
 

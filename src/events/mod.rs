@@ -34,9 +34,11 @@ mod runner;
 mod types;
 
 pub use bus::{EventBus, EventReceiver, EventSubscription};
-pub use handler::{EventHandler, LoggingHandler, MetricsHandler, MetricsSummary, NodeMetrics, spawn_handler};
-pub use runner::{StreamingRunner, StreamingRunResult};
-pub use types::{Event, EventKind, NodeEvent, GraphEvent, CheckpointEvent, StateEvent};
+pub use handler::{
+    spawn_handler, EventHandler, LoggingHandler, MetricsHandler, MetricsSummary, NodeMetrics,
+};
+pub use runner::{StreamingRunResult, StreamingRunner};
+pub use types::{CheckpointEvent, Event, EventKind, GraphEvent, NodeEvent, StateEvent};
 
 use std::sync::Arc;
 

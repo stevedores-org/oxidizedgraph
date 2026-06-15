@@ -35,11 +35,7 @@ pub struct GovernanceNode {
 
 impl GovernanceNode {
     /// Create a node with an inline manifest string.
-    pub fn new(
-        id: impl Into<String>,
-        manifest: impl Into<String>,
-        role: AgentRole,
-    ) -> Self {
+    pub fn new(id: impl Into<String>, manifest: impl Into<String>, role: AgentRole) -> Self {
         Self {
             id: id.into(),
             manifest: manifest.into(),

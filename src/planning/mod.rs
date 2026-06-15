@@ -13,4 +13,4 @@ pub use node::{PlanningNode, SchedulerNode};
 pub use plan::{EpicPlan, Task, TaskStatus};
 pub use progress::PlanProgress;
 pub use scheduler::Scheduler;
-pub use self_healing::{FailureClass, RetryPolicy, RecoveryRecord, classify_failure};
+pub use self_healing::{classify_failure, FailureClass, RecoveryRecord, RetryPolicy};

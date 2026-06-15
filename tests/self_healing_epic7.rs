@@ -3,11 +3,26 @@ use std::sync::{Arc, RwLock};
 
 #[tokio::test]
 async fn test_failure_classification() {
-    assert_eq!(classify_failure("Compilation failed in main.rs:32"), FailureClass::Compile);
-    assert_eq!(classify_failure("cargo build returned error status 101"), FailureClass::Compile);
-    assert_eq!(classify_failure("test failed: assert_eq!(a, b)"), FailureClass::Test);
-    assert_eq!(classify_failure("Connection refused to api.example.com"), FailureClass::Integration);
-    assert_eq!(classify_failure("thread panicked at index out of bounds"), FailureClass::Runtime);
+    assert_eq!(
+        classify_failure("Compilation failed in main.rs:32"),
+        FailureClass::Compile
+    );
+    assert_eq!(
+        classify_failure("cargo build returned error status 101"),
+        FailureClass::Compile
+    );
+    assert_eq!(
+        classify_failure("test failed: assert_eq!(a, b)"),
+        FailureClass::Test
+    );
+    assert_eq!(
+        classify_failure("Connection refused to api.example.com"),
+        FailureClass::Integration
+    );
+    assert_eq!(
+        classify_failure("thread panicked at index out of bounds"),
+        FailureClass::Runtime
+    );
     assert_eq!(classify_failure("some weird error"), FailureClass::Unknown);
 }
 
@@ -50,7 +65,9 @@ async fn test_self_healing_retry_bounds() {
         assert_eq!(rec.status, TaskStatus::Pending);
 
         // Check history
-        let history = guard.get_context::<Vec<RecoveryRecord>>("recovery_history").unwrap();
+        let history = guard
+            .get_context::<Vec<RecoveryRecord>>("recovery_history")
+            .unwrap();
         assert_eq!(history.len(), 1);
         assert_eq!(history[0].task_id, "t1");
         assert_eq!(history[0].attempt, 1);
@@ -80,7 +97,9 @@ async fn test_self_healing_retry_bounds() {
         let t1 = updated_plan.get_task("t1").unwrap();
         assert_eq!(t1.dependencies, vec!["recovery_t1_2".to_string()]);
 
-        let history = guard.get_context::<Vec<RecoveryRecord>>("recovery_history").unwrap();
+        let history = guard
+            .get_context::<Vec<RecoveryRecord>>("recovery_history")
+            .unwrap();
         assert_eq!(history.len(), 2);
         assert_eq!(history[1].attempt, 2);
     }
@@ -104,7 +123,9 @@ async fn test_self_healing_retry_bounds() {
 
     {
         let guard = state.read().unwrap();
-        let history = guard.get_context::<Vec<RecoveryRecord>>("recovery_history").unwrap();
+        let history = guard
+            .get_context::<Vec<RecoveryRecord>>("recovery_history")
+            .unwrap();
         assert_eq!(history.len(), 3);
         assert_eq!(history[2].decision, "Halted (max attempts)");
         assert!(history[2].rationale.contains("Exceeded max attempts"));

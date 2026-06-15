@@ -86,7 +86,11 @@ async fn multi_branch_conditional_routing() {
     }
 
     // Build separate graphs for each branch since CompiledGraph isn't Clone.
-    for (route, expected) in [("path_a", ",path_a"), ("path_b", ",path_b"), ("path_c", ",path_c")] {
+    for (route, expected) in [
+        ("path_a", ",path_a"),
+        ("path_b", ",path_b"),
+        ("path_c", ",path_c"),
+    ] {
         let graph = GraphBuilder::new()
             .add_node(RouterNode)
             .add_node(TrackingNode::new("path_a"))
@@ -325,7 +329,10 @@ async fn conditional_edge_routing() {
 
     let visited: String = result.get_context("visited").unwrap_or_default();
     assert!(visited.contains("start"), "start should have run");
-    assert!(visited.contains("yes_branch"), "should route to yes_branch when not complete");
+    assert!(
+        visited.contains("yes_branch"),
+        "should route to yes_branch when not complete"
+    );
 }
 
 #[tokio::test]
@@ -364,7 +371,10 @@ async fn node_output_finish_stops_immediately() {
     assert_eq!(result.get_context::<bool>("finished"), Some(true));
     // "unreachable" should never have run
     let visited: Option<String> = result.get_context("visited");
-    assert!(visited.is_none(), "unreachable node should not have executed");
+    assert!(
+        visited.is_none(),
+        "unreachable node should not have executed"
+    );
 }
 
 #[tokio::test]

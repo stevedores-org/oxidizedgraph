@@ -13,8 +13,11 @@ use crate::graph::{NodeExecutor, NodeOutput};
 use crate::state::SharedState;
 
 /// Type alias for the async function signature
-pub type AsyncNodeFn =
-    Arc<dyn Fn(SharedState) -> Pin<Box<dyn Future<Output = Result<NodeOutput, NodeError>> + Send>> + Send + Sync>;
+pub type AsyncNodeFn = Arc<
+    dyn Fn(SharedState) -> Pin<Box<dyn Future<Output = Result<NodeOutput, NodeError>> + Send>>
+        + Send
+        + Sync,
+>;
 
 /// A node that wraps a closure for execution
 pub struct FunctionNode {

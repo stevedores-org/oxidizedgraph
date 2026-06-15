@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Decision memory (`memory::decision`) — queryable log of *why* changes were
+  made, keyed by run and artifact. `DecisionStore` trait, in-memory backend,
+  and SurrealDB backend behind the `persistence` feature. First slice of
+  EPIC5 (issue #23).
 - Integration tests for complex graph patterns (`tests/graph_patterns.rs`)
   - Multi-branch conditional routing
   - Cycle with exit condition
