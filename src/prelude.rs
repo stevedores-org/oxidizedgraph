@@ -28,6 +28,13 @@ pub use crate::checkpoint::{
     Checkpoint, CheckpointConfig, Checkpointer, CheckpointingRunner, MemoryCheckpointer, RunResult,
 };
 
+// Memory and retrieval
+pub use crate::memory::{
+    AgentMemoryStore, ContextPacker, ContextPolicy, ContextSection, DecisionMemory, DocumentKind,
+    EpisodicMemory, PackedContext, RepositoryDocument, RepositoryIndex, RetrievalQuery,
+    RetrievalResult, RunOutcome,
+};
+
 // Events and streaming
 pub use crate::events::{
     spawn_handler, Event, EventBus, EventHandler, EventKind, GraphEvent, LoggingHandler,
