@@ -66,7 +66,9 @@ impl NodeExecutor for RAGRetrievalNode {
 
     async fn execute(&self, state: SharedState) -> Result<NodeOutput, NodeError> {
         let query = {
-            let guard = state.read().map_err(|e| NodeError::execution_failed(e.to_string()))?;
+            let guard = state
+                .read()
+                .map_err(|e| NodeError::execution_failed(e.to_string()))?;
             guard.get_context::<String>("query").unwrap_or_default()
         };
 
@@ -79,7 +81,9 @@ impl NodeExecutor for RAGRetrievalNode {
         ];
 
         {
-            let mut guard = state.write().map_err(|e| NodeError::execution_failed(e.to_string()))?;
+            let mut guard = state
+                .write()
+                .map_err(|e| NodeError::execution_failed(e.to_string()))?;
             guard.set_context("retrieved_context", retrieved_context);
         }
 
@@ -102,7 +106,9 @@ impl NodeExecutor for RAGGenerationNode {
 
     async fn execute(&self, state: SharedState) -> Result<NodeOutput, NodeError> {
         let (query, context) = {
-            let guard = state.read().map_err(|e| NodeError::execution_failed(e.to_string()))?;
+            let guard = state
+                .read()
+                .map_err(|e| NodeError::execution_failed(e.to_string()))?;
             let query = guard.get_context::<String>("query").unwrap_or_default();
             let context: Vec<String> = guard.get_context("retrieved_context").unwrap_or_default();
             (query, context)
@@ -117,7 +123,9 @@ impl NodeExecutor for RAGGenerationNode {
         );
 
         {
-            let mut guard = state.write().map_err(|e| NodeError::execution_failed(e.to_string()))?;
+            let mut guard = state
+                .write()
+                .map_err(|e| NodeError::execution_failed(e.to_string()))?;
             guard.set_context("response", response.clone());
             guard.messages.push(Message::assistant(response));
         }
@@ -150,8 +158,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Create checkpointing runner for persistence
     let checkpointer = Arc::new(MemoryCheckpointer::new());
-    let runner = CheckpointingRunner::new(graph, checkpointer.clone())
-        .checkpoint_every_node();
+    let runner = CheckpointingRunner::new(graph, checkpointer.clone()).checkpoint_every_node();
 
     // Create initial state with a query
     let mut initial_state = AgentState::new();

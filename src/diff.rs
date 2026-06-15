@@ -274,16 +274,19 @@ impl CompiledGraph {
     }
 }
 
+fn node_description(g: &CompiledGraph, id: &str) -> Option<String> {
+    g.get_node(id)
+        .and_then(|n| n.executor.description())
+        .map(str::to_string)
+}
+
 fn diff_nodes(before: &CompiledGraph, after: &CompiledGraph) -> Vec<NodeChange> {
     let before_ids = user_node_ids(before);
     let after_ids = user_node_ids(after);
     let mut changes = Vec::new();
 
     for id in before_ids.difference(&after_ids) {
-        let description = before
-            .get_node(id)
-            .and_then(|n| n.executor.description())
-            .map(str::to_string);
+        let description = node_description(before, id);
         changes.push(NodeChange::Removed {
             id: id.clone(),
             description,
@@ -291,10 +294,7 @@ fn diff_nodes(before: &CompiledGraph, after: &CompiledGraph) -> Vec<NodeChange> 
     }
 
     for id in after_ids.difference(&before_ids) {
-        let description = after
-            .get_node(id)
-            .and_then(|n| n.executor.description())
-            .map(str::to_string);
+        let description = node_description(after, id);
         changes.push(NodeChange::Added {
             id: id.clone(),
             description,
@@ -302,14 +302,8 @@ fn diff_nodes(before: &CompiledGraph, after: &CompiledGraph) -> Vec<NodeChange> 
     }
 
     for id in before_ids.intersection(&after_ids) {
-        let b = before
-            .get_node(id)
-            .and_then(|n| n.executor.description())
-            .map(str::to_string);
-        let a = after
-            .get_node(id)
-            .and_then(|n| n.executor.description())
-            .map(str::to_string);
+        let b = node_description(before, id);
+        let a = node_description(after, id);
         if a != b {
             changes.push(NodeChange::DescriptionChanged {
                 id: id.clone(),
@@ -335,24 +329,29 @@ fn user_node_ids(graph: &CompiledGraph) -> BTreeSet<String> {
         .collect()
 }
 
-fn diff_edges(before: &[GraphEdge], after: &[GraphEdge]) -> Vec<EdgeChange> {
-    // Group edges by (from, transition_key) so we can detect "replaced":
-    // same source + transition key, different destination or kind. This
-    // mirrors the runtime's edge-lookup discipline in
-    // CompiledGraph::get_next_node_for_transition.
-    type Key = (String, Option<String>);
-    fn key_of(e: &GraphEdge) -> Key {
-        (e.from.clone(), e.transition_key.clone())
-    }
+type Key = (String, Option<String>);
 
-    let mut before_map: BTreeMap<Key, Vec<&GraphEdge>> = BTreeMap::new();
-    for e in before {
-        before_map.entry(key_of(e)).or_default().push(e);
+fn group_by_key<'a>(
+    edges: impl IntoIterator<Item = &'a GraphEdge>,
+) -> BTreeMap<Key, Vec<&'a GraphEdge>> {
+    let mut map: BTreeMap<Key, Vec<&'a GraphEdge>> = BTreeMap::new();
+    for e in edges {
+        let key = (e.from.clone(), e.transition_key.clone());
+        map.entry(key).or_default().push(e);
     }
-    let mut after_map: BTreeMap<Key, Vec<&GraphEdge>> = BTreeMap::new();
-    for e in after {
-        after_map.entry(key_of(e)).or_default().push(e);
-    }
+    map
+}
+
+fn diff_edges(before: &[GraphEdge], after: &[GraphEdge]) -> Vec<EdgeChange> {
+    let before_filtered = before
+        .iter()
+        .filter(|e| e.from != transitions::END && e.to != transitions::END);
+    let after_filtered = after
+        .iter()
+        .filter(|e| e.from != transitions::END && e.to != transitions::END);
+
+    let before_map = group_by_key(before_filtered);
+    let after_map = group_by_key(after_filtered);
 
     let mut changes = Vec::new();
     let keys: BTreeSet<Key> = before_map.keys().chain(after_map.keys()).cloned().collect();
@@ -431,27 +430,12 @@ fn diff_metadata(
     if !name_changed && !desc_changed {
         return None;
     }
+    let field = |changed: bool, v: Option<&String>| changed.then(|| v.cloned()).flatten();
     Some(MetadataChange {
-        name_before: if name_changed {
-            before_name.cloned()
-        } else {
-            None
-        },
-        name_after: if name_changed {
-            after_name.cloned()
-        } else {
-            None
-        },
-        description_before: if desc_changed {
-            before_desc.cloned()
-        } else {
-            None
-        },
-        description_after: if desc_changed {
-            after_desc.cloned()
-        } else {
-            None
-        },
+        name_before: field(name_changed, before_name),
+        name_after: field(name_changed, after_name),
+        description_before: field(desc_changed, before_desc),
+        description_after: field(desc_changed, after_desc),
     })
 }
 
@@ -903,5 +887,35 @@ mod tests {
         // Re-serialize and compare strings; the type isn't PartialEq so this is
         // the simplest way to check round-trip determinism.
         assert_eq!(s, serde_json::to_string(&back).unwrap());
+    }
+
+    #[test]
+    fn edges_incident_to_end_are_filtered_out() {
+        let before = build(
+            "g",
+            vec![StubNode {
+                id: "x",
+                description: None,
+            }],
+            vec![],
+            "x",
+        );
+        let after = GraphBuilder::new()
+            .name("g")
+            .add_node(StubNode {
+                id: "x",
+                description: None,
+            })
+            .add_edge_to_end("x")
+            .set_entry_point("x")
+            .compile()
+            .unwrap();
+
+        let d = before.diff(&after);
+        assert!(
+            d.edge_changes.is_empty(),
+            "expected no edge changes, got {:?}",
+            d.edge_changes
+        );
     }
 }

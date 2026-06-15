@@ -42,7 +42,11 @@ impl StateValidator {
     }
 
     /// Require a context key to be present with a JSON type (`string`, `number`, etc.).
-    pub fn require_context_type(mut self, key: impl Into<String>, expected_type: &'static str) -> Self {
+    pub fn require_context_type(
+        mut self,
+        key: impl Into<String>,
+        expected_type: &'static str,
+    ) -> Self {
         self.typed_keys.push((key.into(), expected_type));
         self
     }
@@ -141,8 +145,7 @@ mod tests {
 
     #[test]
     fn test_context_type_validation() {
-        let validator =
-            StateValidator::new().require_context_type("gate_passed", "boolean");
+        let validator = StateValidator::new().require_context_type("gate_passed", "boolean");
 
         let mut state = AgentState::new();
         state.set_context("gate_passed", "not-a-bool");

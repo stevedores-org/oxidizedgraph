@@ -72,7 +72,9 @@ impl SecretStore {
         if !credential.allows_scope(scope) {
             return None;
         }
-        self.secrets.get(&credential.handle.redacted_ref()).map(|s| s.as_str())
+        self.secrets
+            .get(&credential.handle.redacted_ref())
+            .map(|s| s.as_str())
     }
 }
 
@@ -121,7 +123,10 @@ impl SecretRedactor {
             }
         }
         // Redact ghs_ and ghp_ GitHub tokens
-        for token in find_tokens(output.as_str(), "ghs_").into_iter().chain(find_tokens(output.as_str(), "ghp_")) {
+        for token in find_tokens(output.as_str(), "ghs_")
+            .into_iter()
+            .chain(find_tokens(output.as_str(), "ghp_"))
+        {
             output = output.replace(&token, "[REDACTED_TOKEN]");
         }
         output
@@ -138,7 +143,10 @@ fn find_tokens(input: &str, prefix: &str) -> Vec<String> {
     let mut tokens = Vec::new();
     for word in input.split_whitespace() {
         if word.starts_with(prefix) {
-            tokens.push(word.trim_matches(|c: char| !c.is_alphanumeric() && c != '_').to_string());
+            tokens.push(
+                word.trim_matches(|c: char| !c.is_alphanumeric() && c != '_')
+                    .to_string(),
+            );
         }
     }
     tokens
@@ -160,7 +168,8 @@ mod tests {
     #[test]
     fn redactor_strips_token_patterns() {
         let redactor = SecretRedactor::enterprise_default();
-        let sanitized = redactor.redact("api_key=supersecret123\nAuthorization: Bearer ghs_abc123token");
+        let sanitized =
+            redactor.redact("api_key=supersecret123\nAuthorization: Bearer ghs_abc123token");
         assert!(!sanitized.contains("supersecret123"));
         assert!(!sanitized.contains("ghs_abc123token"));
         assert!(sanitized.contains("[REDACTED]"));

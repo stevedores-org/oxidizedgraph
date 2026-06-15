@@ -41,11 +41,7 @@ pub struct RbacSubject {
 
 impl RbacSubject {
     /// Create a subject with roles.
-    pub fn new(
-        id: impl Into<String>,
-        tenant: TenantId,
-        roles: Vec<RbacRole>,
-    ) -> Self {
+    pub fn new(id: impl Into<String>, tenant: TenantId, roles: Vec<RbacRole>) -> Self {
         Self {
             id: id.into(),
             tenant,
@@ -184,11 +180,8 @@ mod tests {
     fn blocks_cross_tenant_access_for_operator() {
         let guard = TenantGuard::new();
         let policy = RbacPolicy::enterprise_default();
-        let subject = RbacSubject::new(
-            "alice",
-            TenantId::new("tenant-a"),
-            vec![RbacRole::Operator],
-        );
+        let subject =
+            RbacSubject::new("alice", TenantId::new("tenant-a"), vec![RbacRole::Operator]);
         let result = guard.check_access(
             &subject,
             &TenantId::new("tenant-b"),

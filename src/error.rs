@@ -182,7 +182,10 @@ mod tests {
     #[test]
     fn test_node_error_display() {
         let err = NodeError::execution_failed("Something went wrong");
-        assert_eq!(err.to_string(), "Node execution failed: Something went wrong");
+        assert_eq!(
+            err.to_string(),
+            "Node execution failed: Something went wrong"
+        );
 
         let err = NodeError::Timeout(std::time::Duration::from_secs(30));
         assert!(err.to_string().contains("30"));

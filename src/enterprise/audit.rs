@@ -261,7 +261,13 @@ mod tests {
             "t1", "run-1", "alice", "execute", "graph", "allowed", "ok",
         ));
         log.append(AuditEventFields::new(
-            "t1", "run-1", "alice", "export", "audit", "completed", "bundle",
+            "t1",
+            "run-1",
+            "alice",
+            "export",
+            "audit",
+            "completed",
+            "bundle",
         ));
         assert!(log.verify_chain());
     }
@@ -270,7 +276,13 @@ mod tests {
     fn export_passes_compliance_checks() {
         let mut log = AuditLog::new();
         log.append(AuditEventFields::new(
-            "t1", "run-1", "alice", "execute", "graph", "allowed", "sanitized detail",
+            "t1",
+            "run-1",
+            "alice",
+            "execute",
+            "graph",
+            "allowed",
+            "sanitized detail",
         ));
         let exporter = ComplianceExporter::new();
         let export = exporter.export_tenant(&log, "t1");

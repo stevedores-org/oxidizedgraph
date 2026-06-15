@@ -70,7 +70,11 @@ pub struct Checkpoint {
 
 impl Checkpoint {
     /// Create a new checkpoint
-    pub fn new(thread_id: impl Into<String>, node_id: impl Into<String>, state: AgentState) -> Self {
+    pub fn new(
+        thread_id: impl Into<String>,
+        node_id: impl Into<String>,
+        state: AgentState,
+    ) -> Self {
         Self {
             id: Uuid::new_v4().to_string(),
             thread_id: thread_id.into(),
@@ -198,7 +202,9 @@ mod tests {
 
     #[test]
     fn test_checkpoint_config() {
-        let config = CheckpointConfig::every_node().max_per_thread(10).with_branching();
+        let config = CheckpointConfig::every_node()
+            .max_per_thread(10)
+            .with_branching();
 
         assert!(config.checkpoint_every_node);
         assert_eq!(config.max_checkpoints_per_thread, Some(10));

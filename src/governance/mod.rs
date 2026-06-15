@@ -47,6 +47,4 @@ pub use guidance::{
 pub use node::{GovernanceError, GovernanceNode};
 pub use parser::{blocks_for, parse_blocks, TaggedBlock};
 pub use roles::{AgentRole, RoleParseError};
-pub use routing::{
-    tool_policy_for_state, RoleHandoffNode, RoleRouterNode, RoleTargetRouterNode,
-};
+pub use routing::{tool_policy_for_state, RoleHandoffNode, RoleRouterNode, RoleTargetRouterNode};
