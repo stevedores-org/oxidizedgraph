@@ -64,6 +64,69 @@ struct ErrorResponse {
     code: &'static str,
 }
 
+#[derive(Deserialize)]
+struct HitlPauseRequest {
+    reason: String,
+    #[serde(default)]
+    risk_level: Option<RiskLevel>,
+}
+
+#[derive(Deserialize)]
+struct HitlEditRequest {
+    context_patches: HashMap<String, serde_json::Value>,
+}
+
+#[derive(Deserialize)]
+struct HitlApproveRequest {
+    approver: String,
+    #[serde(default)]
+    rationale: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct HitlDenyRequest {
+    approver: String,
+    rationale: String,
+}
+
+async fn with_session_mut<F, T>(
+    state: &Arc<AppState>,
+    session_id: &str,
+    f: F,
+) -> Result<T, (StatusCode, Json<ErrorResponse>)>
+where
+    F: FnOnce(&mut AgentState) -> Result<T, HitlError>,
+{
+    let sessions = state.sessions.read().await;
+    let shared = sessions.get(session_id).ok_or_else(|| {
+        (
+            StatusCode::NOT_FOUND,
+            Json(ErrorResponse {
+                error: format!("Session {session_id} not found"),
+                code: "SESSION_NOT_FOUND",
+            }),
+        )
+    })?;
+    let mut agent_state = shared.write().map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse {
+                error: format!("Lock error: {e}"),
+                code: "LOCK_ERROR",
+            }),
+        )
+    })?;
+    f(&mut agent_state).map_err(|e| {
+        (
+            StatusCode::CONFLICT,
+            Json(ErrorResponse {
+                error: e.to_string(),
+                code: "HITL_ERROR",
+            }),
+        )
+    })
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     // Initialize tracing
@@ -94,6 +157,12 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/v1/sessions/:id/execute", post(execute))
         .route("/api/v1/sessions/:id/checkpoint", post(checkpoint))
         .route("/api/v1/sessions/:id/restore", post(restore))
+        .route("/api/v1/sessions/:id/hitl/status", get(hitl_status))
+        .route("/api/v1/sessions/:id/hitl/pause", post(hitl_pause))
+        .route("/api/v1/sessions/:id/hitl/edit", post(hitl_edit))
+        .route("/api/v1/sessions/:id/hitl/approve", post(hitl_approve))
+        .route("/api/v1/sessions/:id/hitl/deny", post(hitl_deny))
+        .route("/api/v1/sessions/:id/hitl/timeline", get(hitl_timeline))
         .with_state(state);
 
     // Start server
@@ -299,4 +368,117 @@ async fn restore(
         session_id,
         created: false,
     }))
+}
+
+async fn hitl_status(
+    State(state): State<Arc<AppState>>,
+    Path(session_id): Path<String>,
+) -> Result<Json<HitlStatus>, (StatusCode, Json<ErrorResponse>)> {
+    let sessions = state.sessions.read().await;
+    let shared = sessions.get(&session_id).ok_or_else(|| {
+        (
+            StatusCode::NOT_FOUND,
+            Json(ErrorResponse {
+                error: format!("Session {session_id} not found"),
+                code: "SESSION_NOT_FOUND",
+            }),
+        )
+    })?;
+    let agent_state = shared.read().map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse {
+                error: format!("Lock error: {e}"),
+                code: "LOCK_ERROR",
+            }),
+        )
+    })?;
+    Ok(Json(HitlController::new().status(&agent_state)))
+}
+
+async fn hitl_pause(
+    State(state): State<Arc<AppState>>,
+    Path(session_id): Path<String>,
+    Json(req): Json<HitlPauseRequest>,
+) -> Result<Json<ApprovalRequest>, (StatusCode, Json<ErrorResponse>)> {
+    let controller = HitlController::new();
+    let risk = req.risk_level.unwrap_or(RiskLevel::High);
+    with_session_mut(&state, &session_id, |agent_state| {
+        Ok(controller.pause(agent_state, req.reason, risk))
+    })
+    .await
+    .map(Json)
+}
+
+async fn hitl_edit(
+    State(state): State<Arc<AppState>>,
+    Path(session_id): Path<String>,
+    Json(req): Json<HitlEditRequest>,
+) -> Result<Json<InterventionEdit>, (StatusCode, Json<ErrorResponse>)> {
+    let controller = HitlController::new();
+    let edits = InterventionEdit {
+        context_patches: req.context_patches,
+    };
+    with_session_mut(&state, &session_id, |agent_state| {
+        controller.queue_edits(agent_state, edits.clone())?;
+        Ok(edits)
+    })
+    .await
+    .map(Json)
+}
+
+async fn hitl_approve(
+    State(state): State<Arc<AppState>>,
+    Path(session_id): Path<String>,
+    Json(req): Json<HitlApproveRequest>,
+) -> Result<Json<ApprovalDecision>, (StatusCode, Json<ErrorResponse>)> {
+    let controller = HitlController::new();
+    with_session_mut(&state, &session_id, |agent_state| {
+        controller.approve(agent_state, req.approver, req.rationale)
+    })
+    .await
+    .map(Json)
+}
+
+async fn hitl_deny(
+    State(state): State<Arc<AppState>>,
+    Path(session_id): Path<String>,
+    Json(req): Json<HitlDenyRequest>,
+) -> Result<Json<ApprovalDecision>, (StatusCode, Json<ErrorResponse>)> {
+    let controller = HitlController::new();
+    with_session_mut(&state, &session_id, |agent_state| {
+        controller.deny(agent_state, req.approver, req.rationale)
+    })
+    .await
+    .map(Json)
+}
+
+async fn hitl_timeline(
+    State(state): State<Arc<AppState>>,
+    Path(session_id): Path<String>,
+) -> Result<Json<RunTimeline>, (StatusCode, Json<ErrorResponse>)> {
+    let sessions = state.sessions.read().await;
+    let shared = sessions.get(&session_id).ok_or_else(|| {
+        (
+            StatusCode::NOT_FOUND,
+            Json(ErrorResponse {
+                error: format!("Session {session_id} not found"),
+                code: "SESSION_NOT_FOUND",
+            }),
+        )
+    })?;
+    let agent_state = shared.read().map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse {
+                error: format!("Lock error: {e}"),
+                code: "LOCK_ERROR",
+            }),
+        )
+    })?;
+    let approvals: Vec<ApprovalEvent> = agent_state
+        .get_context(CTX_APPROVAL_EVENTS)
+        .unwrap_or_default();
+    let timeline = RunTimeline::from_artifacts(&[], &approvals);
+    Ok(Json(timeline))
 }
