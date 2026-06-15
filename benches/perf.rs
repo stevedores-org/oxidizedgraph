@@ -5,7 +5,7 @@ use tokio::runtime::Runtime;
 
 struct RouteNode {
     id: String,
-    transition: String,
+    context_key: String,
 }
 
 #[async_trait]
@@ -14,8 +14,14 @@ impl NodeExecutor for RouteNode {
         &self.id
     }
 
-    async fn execute(&self, _state: SharedState) -> Result<NodeOutput, NodeError> {
-        Ok(NodeOutput::transition(self.transition.clone()))
+    async fn execute(&self, state: SharedState) -> Result<NodeOutput, NodeError> {
+        let guard = state
+            .read()
+            .map_err(|e| NodeError::execution_failed(e.to_string()))?;
+        let transition = guard
+            .get_context::<String>(&self.context_key)
+            .unwrap_or_else(|| "route-0".to_string());
+        Ok(NodeOutput::transition(transition))
     }
 }
 
@@ -41,7 +47,7 @@ fn build_compile_graph(width: usize) -> GraphBuilder {
 
     builder = builder.add_node(RouteNode {
         id: "router".to_string(),
-        transition: "route-0".to_string(),
+        context_key: "route".to_string(),
     });
 
     for idx in 0..width {
@@ -95,7 +101,7 @@ fn benchmark_checkpoint_save(c: &mut Criterion) {
 
     c.bench_function("checkpoint_save", |b| {
         b.iter_batched(
-            MemoryCheckpointer::new,
+            || MemoryCheckpointer::new(),
             |checkpointer| {
                 runtime.block_on(async {
                     checkpointer

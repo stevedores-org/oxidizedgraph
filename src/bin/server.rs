@@ -66,7 +66,7 @@ enum GovernanceCommands {
 /// Application state
 struct AppState {
     sessions: RwLock<HashMap<String, SharedState>>,
-    workflow: CompiledGraph,
+    workflow: Arc<CompiledGraph>,
     checkpointer: Arc<MemoryCheckpointer>,
     tasks: Arc<TaskStore>,
     spawner: Arc<dyn WorkerSpawner>,
@@ -167,7 +167,7 @@ fn build_workflow() -> CompiledGraph {
                     (
                         guard
                             .get_context::<serde_json::Value>("input")
-                            .unwrap_or(serde_json::Value::Null),
+                            .unwrap_or_else(|| serde_json::Value::Null),
                         guard.get_context::<String>("run_id").unwrap_or_default(),
                         guard
                             .get_context::<String>("session_id")
@@ -232,12 +232,12 @@ async fn write_back_session(
 }
 
 async fn run_session_workflow(
-    workflow: &CompiledGraph,
+    workflow: impl Into<Arc<CompiledGraph>>,
     session_id: &str,
     state: AgentState,
 ) -> Result<TracedRunResult, RuntimeError> {
     let run_context = RunContext::with_ids(Uuid::new_v4().to_string(), session_id.to_string());
-    let runner = TracedRunner::with_context(workflow.clone(), run_context, RunnerConfig::default());
+    let runner = TracedRunner::with_context(workflow, run_context, RunnerConfig::default());
     runner.invoke(state).await
 }
 
@@ -385,7 +385,7 @@ async fn run_server(port: u16) -> anyhow::Result<()> {
     let spawner = worker::spawner_from_env().await?;
     let state = Arc::new(AppState {
         sessions: RwLock::new(HashMap::new()),
-        workflow: build_workflow(),
+        workflow: Arc::new(build_workflow()),
         checkpointer: Arc::new(MemoryCheckpointer::new()),
         tasks: Arc::new(TaskStore::new()),
         spawner: Arc::from(spawner),
@@ -521,7 +521,7 @@ async fn execute(
     initial_state.set_context("input", req.input.clone());
     initial_state.set_context("session_id", session_id.clone());
 
-    let result = run_session_workflow(&state.workflow, &session_id, initial_state)
+    let result = run_session_workflow(state.workflow.clone(), &session_id, initial_state)
         .await
         .map_err(|e| {
             (
@@ -760,7 +760,7 @@ mod tests {
         state.set_context("input", serde_json::json!({"prompt": "hello"}));
         state.set_context("session_id", "session-1");
 
-        let result = run_session_workflow(&workflow, "session-1", state)
+        let result = run_session_workflow(Arc::new(workflow), "session-1", state)
             .await
             .unwrap();
 

@@ -36,7 +36,7 @@ crossbeam-channel = "0.5"
 git2 = "0.19"
 axum = "0.7"
 
-# Kubernetes worker spawning (issue #41) — optional, enabled in-cluster
+# Kubernetes worker spawning (issue #41) - optional, enabled in-cluster
 kube = { version = "0.98", features = ["runtime", "derive"], optional = true }
 k8s-openapi = { version = "0.24", features = ["v1_30"], optional = true }
 
