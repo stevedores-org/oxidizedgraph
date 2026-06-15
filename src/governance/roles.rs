@@ -22,6 +22,18 @@ use std::str::FromStr;
 /// `All` is the broadcast tag (`<@all>`). The four named variants are the
 /// canonical roles called out in issue #31; `Custom` carries any other
 /// tag (tool names, domain tags) verbatim so no information is lost.
+///
+/// # Note on `Auditor` / `Human`
+///
+/// The four canonical variants come from the issue #31 *spec*, not from
+/// the current `AGENTS.md`. The live manifest exercises `<@all>`,
+/// `<@architect>`, and `<@builder>` plus several tool/domain tags
+/// (`<@codex>`, `<@gemini>`, `<@sdlc>`, …); `Auditor` and `Human` are
+/// modelled here for forward use by `GovernanceNode` rule lookups, not
+/// because they appear in-tree today.
+///
+/// The `Hash` derive is intentional: a follow-up `guidance.rs` slice
+/// will use `AgentRole` as a key in rule / dispatch tables.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AgentRole {
@@ -85,31 +97,23 @@ pub enum RoleParseError {
     InvalidCharacter(String),
 }
 
-impl FromStr for AgentRole {
-    type Err = RoleParseError;
-
-    /// Parse a tag from its raw form — accepts the inner name (`builder`)
-    /// or the fully-tagged form (`<@builder>` / `@builder`), case
-    /// insensitively. Unknown but well-formed tags become
-    /// [`AgentRole::Custom`].
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+impl AgentRole {
+    /// Parse an *undecorated* tag body (e.g. `"builder"`, `"codex"`).
+    ///
+    /// This is the strict counterpart to [`FromStr::from_str`], which
+    /// accepts decorated forms (`<@builder>`, `@builder`). Use this when
+    /// the caller has already stripped decoration and would rather treat
+    /// any remaining `<@`/`@`/`>` characters as invalid input than have
+    /// them silently re-stripped. `parse_tag_line` in the sibling parser
+    /// module relies on this strictness — it lets a malformed input like
+    /// `<@<@builder>>` produce no boundary instead of silently parsing as
+    /// `Builder`.
+    pub fn from_inner(s: &str) -> Result<Self, RoleParseError> {
         let trimmed = s.trim();
         if trimmed.is_empty() {
             return Err(RoleParseError::Empty);
         }
-        // Strip optional `<@...>` or `@...` decoration so callers can pass
-        // either form. We only strip the outermost layer; nested angle
-        // brackets fall through to the InvalidCharacter check below.
-        let inner = trimmed
-            .strip_prefix("<@")
-            .and_then(|s| s.strip_suffix('>'))
-            .or_else(|| trimmed.strip_prefix('@'))
-            .unwrap_or(trimmed);
-
-        let lower = inner.to_ascii_lowercase();
-        if lower.is_empty() {
-            return Err(RoleParseError::Empty);
-        }
+        let lower = trimmed.to_ascii_lowercase();
         if !lower
             .chars()
             .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-')
@@ -125,6 +129,33 @@ impl FromStr for AgentRole {
             "human" => Self::Human,
             _ => Self::Custom(lower),
         })
+    }
+}
+
+impl FromStr for AgentRole {
+    type Err = RoleParseError;
+
+    /// Parse a tag from its raw form — accepts the inner name (`builder`)
+    /// or the fully-tagged form (`<@builder>` / `@builder`), case
+    /// insensitively. Unknown but well-formed tags become
+    /// [`AgentRole::Custom`]. Strict callers that have already stripped
+    /// decoration should prefer [`AgentRole::from_inner`] to avoid
+    /// double-stripping malformed inputs.
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let trimmed = s.trim();
+        if trimmed.is_empty() {
+            return Err(RoleParseError::Empty);
+        }
+        // Strip optional `<@...>` or `@...` decoration so callers can pass
+        // either form. Once the outermost layer is gone, defer to the
+        // strict `from_inner` so nested decoration doesn't get peeled
+        // a second time.
+        let inner = trimmed
+            .strip_prefix("<@")
+            .and_then(|s| s.strip_suffix('>'))
+            .or_else(|| trimmed.strip_prefix('@'))
+            .unwrap_or(trimmed);
+        Self::from_inner(inner)
     }
 }
 
@@ -232,5 +263,33 @@ mod tests {
         // `All` subscribers do NOT pick up concrete-role traffic — that
         // would defeat the point of role-scoped guidance.
         assert!(!AgentRole::All.receives(&AgentRole::Builder));
+    }
+
+    #[test]
+    fn from_inner_is_strict_about_decoration() {
+        // `from_inner` is the strict variant called from `parse_tag_line`
+        // after the outer `<@`/`>` has already been stripped. Any leftover
+        // decoration must be rejected — that's what prevents pathological
+        // inputs like `<@<@builder>>` from silently parsing as `Builder`.
+        assert!(AgentRole::from_inner("<@builder>").is_err());
+        assert!(AgentRole::from_inner("@builder").is_err());
+        // Bare names still work.
+        assert_eq!(
+            AgentRole::from_inner("builder").unwrap(),
+            AgentRole::Builder
+        );
+        assert_eq!(
+            AgentRole::from_inner("codex").unwrap(),
+            AgentRole::Custom("codex".into())
+        );
+        // Empty / whitespace-only still empty.
+        assert_eq!(
+            AgentRole::from_inner("").unwrap_err(),
+            RoleParseError::Empty
+        );
+        assert_eq!(
+            AgentRole::from_inner("   ").unwrap_err(),
+            RoleParseError::Empty
+        );
     }
 }

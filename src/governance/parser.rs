@@ -19,7 +19,6 @@
 //! [`parse_blocks`] without re-implementing the scan.
 
 use crate::governance::roles::AgentRole;
-use std::str::FromStr;
 
 /// One contiguous region of a manifest scoped to a single role.
 ///
@@ -106,16 +105,19 @@ pub fn blocks_for<'a>(
 /// only), return the parsed role. A line like `prose <@builder> more
 /// prose` returns `None` — the tag must own the line to count as a
 /// block boundary, mirroring how `AGENTS.md` actually uses these.
+///
+/// Strict on the inner content: we strip the outer `<@`/`>` ourselves
+/// and feed the result to [`AgentRole::from_inner`] rather than the
+/// decoration-tolerant `FromStr`. This means a pathological input
+/// like `<@<@builder>>` produces `None` (the inner `<@builder>` is
+/// not a valid bare tag) instead of silently parsing as `Builder`.
 fn parse_tag_line(line: &str) -> Option<AgentRole> {
     let trimmed = line.trim();
     if !trimmed.starts_with("<@") || !trimmed.ends_with('>') {
         return None;
     }
-    // strip prefix/suffix and feed FromStr; FromStr re-handles the
-    // decoration but accepts the inner form directly too. Both error
-    // variants are equally "not a real boundary" — discard them.
     let inner = &trimmed[2..trimmed.len() - 1];
-    AgentRole::from_str(inner).ok()
+    AgentRole::from_inner(inner).ok()
 }
 
 #[cfg(test)]
@@ -254,5 +256,51 @@ mod tests {
         let blocks = parse_blocks(input);
         assert_eq!(blocks[0].tag_line, 1);
         assert_eq!(blocks[1].tag_line, 3);
+    }
+
+    /// Regression for the F5 finding on the WS1 follow-up CRR: `tag_line`
+    /// must stay accurate across many blocks with varying body lengths,
+    /// not just the trivial two-block case. Future `guidance.rs` slices
+    /// will surface diagnostics keyed on this value.
+    #[test]
+    fn tag_line_tracks_across_multi_block_input() {
+        let input = "\
+<@all>
+broadcast body 1
+broadcast body 2
+broadcast body 3
+<@architect>
+architect body
+<@builder>
+
+
+builder with leading blanks
+<@auditor>
+final block
+";
+        let blocks = parse_blocks(input);
+        assert_eq!(blocks.len(), 4);
+        let tag_lines: Vec<usize> = blocks.iter().map(|b| b.tag_line).collect();
+        // Lines: <@all>=1, body=2,3,4, <@architect>=5, body=6, <@builder>=7,
+        // blanks=8,9, body=10, <@auditor>=11, final=12.
+        assert_eq!(tag_lines, vec![1, 5, 7, 11]);
+    }
+
+    /// Regression for the F2 finding on the WS1 follow-up CRR: a
+    /// pathological double-wrapped tag like `<@<@builder>>` must NOT
+    /// silently parse as `Builder`. The strict `from_inner` path rejects
+    /// the inner `<@builder>` because it contains `<` / `>` characters
+    /// that aren't allowed in a bare tag body.
+    #[test]
+    fn nested_tag_decoration_is_not_a_boundary() {
+        let input = "<@builder>\nfirst\n<@<@builder>>\nsecond\n";
+        let blocks = parse_blocks(input);
+        // The malformed line is body, not a boundary — the single block
+        // stays open and absorbs both `first` and `second`.
+        assert_eq!(blocks.len(), 1);
+        assert_eq!(blocks[0].role, AgentRole::Builder);
+        assert!(blocks[0].content.contains("first"));
+        assert!(blocks[0].content.contains("<@<@builder>>"));
+        assert!(blocks[0].content.contains("second"));
     }
 }
