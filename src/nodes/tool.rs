@@ -264,12 +264,27 @@ impl NodeExecutor for ToolNode {
             return Ok(NodeOutput::cont());
         }
 
+        let dynamic_engine;
+        let policy_to_use = if let Some(ref config_policy) = self.config.policy {
+            Some(config_policy)
+        } else {
+            let guard = state
+                .read()
+                .map_err(|e| NodeError::execution_failed(e.to_string()))?;
+            let policy = crate::governance::tool_policy_for_state(
+                &guard,
+                &crate::governance::AgentRole::Builder,
+            );
+            dynamic_engine = Some(crate::tools::policy::ToolPolicyEngine::new(policy));
+            dynamic_engine.as_ref()
+        };
+
         // Execute each tool call
         let mut results = Vec::new();
         for call in &tool_calls {
             let result = self
                 .registry
-                .execute_with_policy(call, self.config.policy.as_ref(), self.config.tool_timeout)
+                .execute_with_policy(call, policy_to_use, self.config.tool_timeout)
                 .await;
             results.push(result);
         }

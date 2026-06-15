@@ -47,6 +47,17 @@ pub enum GraphError {
     },
 }
 
+/// A CI diagnostic message (e.g. from Nix or a linter)
+#[derive(Clone, Debug)]
+pub struct Diagnostic {
+    /// The file or target
+    pub target: String,
+    /// The error message
+    pub message: String,
+    /// Line number, if applicable
+    pub line: Option<usize>,
+}
+
 /// Errors that can occur during node execution
 #[derive(Error, Debug)]
 pub enum NodeError {
@@ -77,6 +88,21 @@ pub enum NodeError {
     /// IO error
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
+
+    /// Governance rule violation
+    #[error("Governance violation: {0}")]
+    GovernanceViolation(String),
+
+    /// Diagnostic error (e.g. from Nix CI)
+    #[error("Diagnostic error in {target}: {message}")]
+    DiagnosticError {
+        /// Target where the error occurred
+        target: String,
+        /// The error message
+        message: String,
+        /// Line number, if applicable
+        line: Option<usize>,
+    },
 
     /// Generic error wrapper
     #[error("{0}")]
