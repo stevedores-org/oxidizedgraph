@@ -91,7 +91,9 @@ If NetworkPolicy/PDB were previously applied into `default`, delete them and re-
 | `/health` | GET | Liveness (k8s probe) |
 | `/readiness` | GET | Readiness (k8s probe) |
 | `/api/v1/sessions` | POST | Create session |
-| `/api/v1/sessions/{id}/execute` | POST | Run graph |
+| `/api/v1/sessions/{id}/execute` | POST | Run the server workflow graph, persist a checkpoint, and return trace metadata |
+| `/api/v1/sessions/{id}/checkpoint` | POST | Persist the current session state as a checkpoint |
+| `/api/v1/sessions/{id}/restore` | POST | Restore a session from a checkpoint payload or checkpoint ID |
 | `/api/v1/sessions/{id}/hitl/status` | GET | HITL pause/request/explanation status |
 | `/api/v1/sessions/{id}/hitl/pause` | POST | Operator pause + checkpoint |
 | `/api/v1/sessions/{id}/hitl/edit` | POST | Queue context edits before resume |

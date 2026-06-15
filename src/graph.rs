@@ -389,6 +389,7 @@ impl GraphBuilder {
         Ok(CompiledGraph {
             graph,
             node_indices,
+            edge_routes: build_edge_routes(&self.edges),
             edges: self.edges,
             entry_point: entry,
             name: self.name,
@@ -406,10 +407,17 @@ impl GraphBuilder {
 pub struct CompiledGraph {
     pub(crate) graph: StableGraph<GraphNode, GraphEdge>,
     pub(crate) node_indices: HashMap<String, NodeIndex>,
+    pub(crate) edge_routes: HashMap<String, GraphEdgeRoutes>,
     pub(crate) edges: Vec<GraphEdge>,
     pub(crate) entry_point: String,
     pub(crate) name: Option<String>,
     pub(crate) description: Option<String>,
+}
+
+#[derive(Clone, Default)]
+pub(crate) struct GraphEdgeRoutes {
+    keyed: HashMap<String, GraphEdge>,
+    default: Option<GraphEdge>,
 }
 
 impl CompiledGraph {
@@ -437,30 +445,16 @@ impl CompiledGraph {
         state: &AgentState,
         transition_key: &str,
     ) -> Option<String> {
-        // First, exact transition-key match.
-        for edge in &self.edges {
-            if edge.from != from {
-                continue;
+        if let Some(routes) = self.edge_routes.get(from) {
+            if let Some(edge) = routes.keyed.get(transition_key) {
+                return resolve_edge(edge, state);
             }
-            if edge.transition_key.as_deref() != Some(transition_key) {
-                continue;
-            }
-            return match &edge.edge_type {
-                EdgeType::Direct => Some(edge.to.clone()),
-                EdgeType::Conditional(router) => Some(router(state)),
-            };
-        }
 
-        // Backward compatibility: unkeyed edges are default CONTINUE path.
-        if transition_key == transitions::CONTINUE {
-            for edge in &self.edges {
-                if edge.from != from || edge.transition_key.is_some() {
-                    continue;
+            // Backward compatibility: unkeyed edges are default CONTINUE path.
+            if transition_key == transitions::CONTINUE {
+                if let Some(edge) = routes.default.as_ref() {
+                    return resolve_edge(edge, state);
                 }
-                return match &edge.edge_type {
-                    EdgeType::Direct => Some(edge.to.clone()),
-                    EdgeType::Conditional(router) => Some(router(state)),
-                };
             }
         }
 
@@ -512,6 +506,34 @@ impl CompiledGraph {
 
         output
     }
+}
+
+fn resolve_edge(edge: &GraphEdge, state: &AgentState) -> Option<String> {
+    match &edge.edge_type {
+        EdgeType::Direct => Some(edge.to.clone()),
+        EdgeType::Conditional(router) => Some(router(state)),
+    }
+}
+
+fn build_edge_routes(edges: &[GraphEdge]) -> HashMap<String, GraphEdgeRoutes> {
+    let mut routes: HashMap<String, GraphEdgeRoutes> = HashMap::new();
+
+    for edge in edges {
+        let entry = routes.entry(edge.from.clone()).or_default();
+        match edge.transition_key.as_deref() {
+            Some(key) => {
+                entry
+                    .keyed
+                    .entry(key.to_string())
+                    .or_insert_with(|| edge.clone());
+            }
+            None => {
+                entry.default.get_or_insert_with(|| edge.clone());
+            }
+        }
+    }
+
+    routes
 }
 
 /// Internal END node that terminates execution
