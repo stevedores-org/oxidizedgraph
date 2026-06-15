@@ -1,8 +1,14 @@
 # Worker Job orchestration (issue #41)
 
-oxidizedgraph runs as a long-lived Deployment on the AKS hub. Build tasks arrive
-over **A2A JSON-RPC** at `POST /rpc`; the orchestrator spawns one ephemeral
-`batch/v1.Job` per task.
+oxidizedgraph runs as a long-lived Deployment on **stevedores-org GKE** (`hub`
+namespace). Build tasks arrive over **A2A JSON-RPC** at `POST /rpc`; the
+orchestrator spawns one ephemeral `batch/v1.Job` per task in the `workers`
+namespace.
+
+Production GitOps for hub + workers lives in
+[stevedores-org/crossplane-heaven](https://github.com/stevedores-org/crossplane-heaven)
+(`infrastructure/gke/hub/`). This repo ships a matching kustomize overlay for
+local smoke tests.
 
 ## Runtime flow
 
@@ -33,17 +39,17 @@ over **A2A JSON-RPC** at `POST /rpc`; the orchestrator spawns one ephemeral
 ## Deploy
 
 ```bash
-# Dev / GKE / EKS — memory spawner (no cluster Job API needed)
+# Dev — memory spawner (no cluster Job API needed)
 kustomize build deploy/base | kubectl apply -f -
 
-# AKS hub — enables k8s spawner + Azure WI annotation placeholder
-kustomize build deploy/overlays/aks-hub | kubectl apply -f -
+# stevedores-org GKE hub — k8s spawner + GKE Workload Identity placeholder
+kustomize build deploy/overlays/gke-hub | kubectl apply -f -
+
+# GKE Autopilot (oxidizedgraph namespace, memory spawner)
+kustomize build deploy/overlays/gke-autopilot | kubectl apply -f -
 ```
 
 Worker Job shape is documented in `deploy/base/worker-job-template.yaml`.
-Crossplane templates and Workload Identity wiring live in
-[stevedores-org/crossplane-heaven](https://github.com/stevedores-org/crossplane-heaven)
-(issues #4, #5).
 
 ## Example JSON-RPC
 
