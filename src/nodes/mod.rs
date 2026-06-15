@@ -9,6 +9,7 @@
 pub mod conditional;
 pub mod function;
 pub mod llm;
+pub mod quality;
 pub mod tool;
 
 use async_trait::async_trait;
