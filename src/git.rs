@@ -88,9 +88,7 @@ pub fn push(repo_path: impl AsRef<Path>, remote_name: &str, branch: Option<&str>
         Some(b) => b.to_string(),
         None => {
             let head = repo.head().map_err(|_| GitError::NoBranch)?;
-            head.shorthand()
-                .ok_or(GitError::NoBranch)?
-                .to_string()
+            head.shorthand().ok_or(GitError::NoBranch)?.to_string()
         }
     };
 
@@ -131,9 +129,7 @@ where
         Some(b) => b.to_string(),
         None => {
             let head = repo.head().map_err(|_| GitError::NoBranch)?;
-            head.shorthand()
-                .ok_or(GitError::NoBranch)?
-                .to_string()
+            head.shorthand().ok_or(GitError::NoBranch)?.to_string()
         }
     };
 
@@ -161,7 +157,9 @@ fn credential_callback(
         let home = env::var("HOME").unwrap_or_else(|_| ".".to_string());
         for key_name in &["id_ed25519", "id_rsa", "id_ecdsa"] {
             let private_key = Path::new(&home).join(".ssh").join(key_name);
-            let public_key = Path::new(&home).join(".ssh").join(format!("{}.pub", key_name));
+            let public_key = Path::new(&home)
+                .join(".ssh")
+                .join(format!("{}.pub", key_name));
 
             if private_key.exists() {
                 if let Ok(cred) = Cred::ssh_key(username, Some(&public_key), &private_key, None) {

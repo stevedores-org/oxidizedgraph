@@ -6,9 +6,7 @@ use std::sync::{Arc, RwLock};
 fn sample_graph() -> CrossRepoChangeGraph {
     let mut graph = CrossRepoChangeGraph::new("issue-27", "run-1");
     graph.add_change(RepoChange::new("infra", "org/infra", "Publish module"));
-    graph.add_change(
-        RepoChange::new("app", "org/app", "Deploy service").depends_on("infra"),
-    );
+    graph.add_change(RepoChange::new("app", "org/app", "Deploy service").depends_on("infra"));
     graph
 }
 
@@ -61,7 +59,10 @@ async fn epic9_graph_walks_infra_then_app() {
     let first = coordinator.execute(shared.clone()).await.unwrap();
     assert_eq!(first.target(), Some("execute_change"));
     assert_eq!(
-        shared.read().unwrap().get_context::<String>(CTX_CURRENT_REPO_CHANGE),
+        shared
+            .read()
+            .unwrap()
+            .get_context::<String>(CTX_CURRENT_REPO_CHANGE),
         Some("infra".to_string())
     );
 
@@ -70,7 +71,10 @@ async fn epic9_graph_walks_infra_then_app() {
     let second = coordinator.execute(shared.clone()).await.unwrap();
     assert_eq!(second.target(), Some("execute_change"));
     assert_eq!(
-        shared.read().unwrap().get_context::<String>(CTX_CURRENT_REPO_CHANGE),
+        shared
+            .read()
+            .unwrap()
+            .get_context::<String>(CTX_CURRENT_REPO_CHANGE),
         Some("app".to_string())
     );
 }

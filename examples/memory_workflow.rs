@@ -11,8 +11,16 @@ fn main() -> anyhow::Result<()> {
     index.index_documents([
         RepositoryDocument::source(repo, "src/memory.rs", "context packing retrieval ranking")
             .with_symbol("ContextPacker"),
-        RepositoryDocument::source(repo, "src/planning/plan.rs", "EpicPlan task decomposition scheduler"),
-        RepositoryDocument::source(repo, "src/governance/node.rs", "GovernanceNode role guidance manifest"),
+        RepositoryDocument::source(
+            repo,
+            "src/planning/plan.rs",
+            "EpicPlan task decomposition scheduler",
+        ),
+        RepositoryDocument::source(
+            repo,
+            "src/governance/node.rs",
+            "GovernanceNode role guidance manifest",
+        ),
     ]);
 
     let query = RetrievalQuery::new("context packing governance")
@@ -21,7 +29,10 @@ fn main() -> anyhow::Result<()> {
     let hits = index.query(&query);
     println!("Retrieval hits: {}", hits.len());
     for hit in &hits {
-        println!("  {:.2} {} — {:?}", hit.score, hit.document.path, hit.matched_terms);
+        println!(
+            "  {:.2} {} — {:?}",
+            hit.score, hit.document.path, hit.matched_terms
+        );
     }
 
     let mut store = AgentMemoryStore::new();

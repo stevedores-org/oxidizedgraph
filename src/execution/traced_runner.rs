@@ -42,7 +42,11 @@ impl TracedRunner {
     }
 
     /// Create a traced runner with explicit run context and config.
-    pub fn with_context(graph: CompiledGraph, run_context: RunContext, config: RunnerConfig) -> Self {
+    pub fn with_context(
+        graph: CompiledGraph,
+        run_context: RunContext,
+        config: RunnerConfig,
+    ) -> Self {
         Self {
             graph,
             config,
@@ -70,7 +74,10 @@ impl TracedRunner {
 
     /// Execute the graph and return state plus trace artifacts.
     #[instrument(skip(self, initial_state), fields(run_id = %self.run_context.run_id))]
-    pub async fn invoke(&self, mut initial_state: AgentState) -> Result<TracedRunResult, RuntimeError> {
+    pub async fn invoke(
+        &self,
+        mut initial_state: AgentState,
+    ) -> Result<TracedRunResult, RuntimeError> {
         attach_run_context(&mut initial_state, &self.run_context);
         if let Some(ref validator) = self.validator {
             validator

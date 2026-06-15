@@ -55,7 +55,10 @@ async fn main() -> anyhow::Result<()> {
         .add_node(StaticTransitionNode::new("human_review", "done"))
         .add_node(EchoNode::new("review", "Queued for optional human review"))
         .add_node(StaticTransitionNode::new("fix_loop", "implement"))
-        .add_node(EchoNode::new("done", "Workflow complete — ready to open PR"))
+        .add_node(EchoNode::new(
+            "done",
+            "Workflow complete — ready to open PR",
+        ))
         .set_entry_point("implement")
         .add_edge("implement", "quality_gate")
         .add_edge_with_key("quality_gate", "ship", "passed")
@@ -85,7 +88,11 @@ async fn main() -> anyhow::Result<()> {
         println!("Change: {summary}");
     }
     if let Some(gate) = result.state.get_context::<GateResult>("gate_result") {
-        println!("Gate passed: {} (checks: {})", gate.passed, gate.checks.len());
+        println!(
+            "Gate passed: {} (checks: {})",
+            gate.passed,
+            gate.checks.len()
+        );
     }
     if let Some(blocker) = result.state.get_context::<MergeBlocker>("merge_blocker") {
         if blocker.blocked {

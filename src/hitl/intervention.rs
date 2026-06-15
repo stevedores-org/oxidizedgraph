@@ -10,9 +10,9 @@ use crate::state::AgentState;
 use super::explain::ReviewSummaryBuilder;
 use super::policy::ApprovalPolicy;
 use super::types::{
-    append_approval_event, ApprovalDecision, ApprovalEvent, ApprovalRequest,
-    ExplanationPayload, InterventionEdit, CTX_APPROVAL_DECISION, CTX_APPROVAL_EVENTS,
-    CTX_APPROVAL_REQUEST, CTX_EXPLANATION, CTX_HITL_EDITS, CTX_HITL_PAUSED,
+    append_approval_event, ApprovalDecision, ApprovalEvent, ApprovalRequest, ExplanationPayload,
+    InterventionEdit, CTX_APPROVAL_DECISION, CTX_APPROVAL_EVENTS, CTX_APPROVAL_REQUEST,
+    CTX_EXPLANATION, CTX_HITL_EDITS, CTX_HITL_PAUSED,
 };
 
 /// Current HITL status for a paused run.
@@ -84,10 +84,9 @@ impl HitlController {
             .get_context::<String>("change_summary")
             .unwrap_or_default();
         let request = ApprovalRequest::new(reason, risk_level).with_summary(summary);
-        let review = self.summarizer.from_state(
-            state,
-            format!("Manual pause: {}", request.reason),
-        );
+        let review = self
+            .summarizer
+            .from_state(state, format!("Manual pause: {}", request.reason));
         let explanation = self.summarizer.to_explanation(&review);
 
         append_approval_event(state, ApprovalEvent::checkpoint_created(&request));
@@ -100,14 +99,15 @@ impl HitlController {
     }
 
     /// Queue operator edits to apply before resume (without losing state).
-    pub fn queue_edits(&self, state: &mut AgentState, edits: InterventionEdit) -> Result<(), HitlError> {
+    pub fn queue_edits(
+        &self,
+        state: &mut AgentState,
+        edits: InterventionEdit,
+    ) -> Result<(), HitlError> {
         if !state.get_context::<bool>(CTX_HITL_PAUSED).unwrap_or(false) {
             return Err(HitlError::NotPaused);
         }
-        append_approval_event(
-            state,
-            ApprovalEvent::intervention_edited(&edits),
-        );
+        append_approval_event(state, ApprovalEvent::intervention_edited(&edits));
         state.set_context(CTX_HITL_EDITS, edits);
         Ok(())
     }

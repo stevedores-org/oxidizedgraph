@@ -140,7 +140,9 @@ impl BranchNode {
     }
 
     /// Add a branch that checks a context value
-    pub fn branch_on_context<T: for<'de> serde::Deserialize<'de> + PartialEq + Send + Sync + 'static>(
+    pub fn branch_on_context<
+        T: for<'de> serde::Deserialize<'de> + PartialEq + Send + Sync + 'static,
+    >(
         self,
         key: impl Into<String>,
         expected: T,
@@ -148,7 +150,12 @@ impl BranchNode {
     ) -> Self {
         let key = key.into();
         self.branch(
-            move |state| state.get_context::<T>(&key).map(|v| v == expected).unwrap_or(false),
+            move |state| {
+                state
+                    .get_context::<T>(&key)
+                    .map(|v| v == expected)
+                    .unwrap_or(false)
+            },
             target,
         )
     }
@@ -193,12 +200,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_conditional_node_true() {
-        let node = ConditionalNode::new(
-            "cond",
-            |state| state.is_complete,
-            "done",
-            "continue",
-        );
+        let node = ConditionalNode::new("cond", |state| state.is_complete, "done", "continue");
 
         let mut state = AgentState::new();
         state.is_complete = true;
@@ -210,12 +212,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_conditional_node_false() {
-        let node = ConditionalNode::new(
-            "cond",
-            |state| state.is_complete,
-            "done",
-            "continue",
-        );
+        let node = ConditionalNode::new("cond", |state| state.is_complete, "done", "continue");
 
         let state = AgentState::new();
         let shared = Arc::new(RwLock::new(state));
@@ -243,7 +240,9 @@ mod tests {
         let node = ConditionalNode::has_tool_calls("check", "execute_tools", "respond");
 
         let mut state = AgentState::new();
-        state.tool_calls.push(ToolCall::new("1", "test", serde_json::json!({})));
+        state
+            .tool_calls
+            .push(ToolCall::new("1", "test", serde_json::json!({})));
         let shared = Arc::new(RwLock::new(state));
 
         let result = node.execute(shared).await.unwrap();

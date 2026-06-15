@@ -325,15 +325,23 @@ mod tests {
         struct NoToolProvider;
         #[async_trait]
         impl LLMProvider for NoToolProvider {
-            async fn generate(&self, _m: &[Message], _c: &LLMConfig) -> Result<LLMResponse, NodeError> {
+            async fn generate(
+                &self,
+                _m: &[Message],
+                _c: &LLMConfig,
+            ) -> Result<LLMResponse, NodeError> {
                 Ok(LLMResponse::text("No tools here"))
             }
-            fn name(&self) -> &str { "mock" }
+            fn name(&self) -> &str {
+                "mock"
+            }
         }
 
         let node = LLMNode::with_provider("llm", NoToolProvider);
         let mut state = AgentState::new();
-        state.tool_calls.push(ToolCall::new("old", "old_tool", serde_json::json!({})));
+        state
+            .tool_calls
+            .push(ToolCall::new("old", "old_tool", serde_json::json!({})));
         let shared = Arc::new(RwLock::new(state));
 
         let _ = node.execute(shared.clone()).await.unwrap();

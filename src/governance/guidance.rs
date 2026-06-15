@@ -135,10 +135,7 @@ Builder-only rules.
             &AgentRole::Builder,
             &GovernanceConfig::permissive(),
         );
-        assert_eq!(
-            agent_role_from_state(&state),
-            Some(AgentRole::Builder)
-        );
+        assert_eq!(agent_role_from_state(&state), Some(AgentRole::Builder));
         assert!(state
             .get_context::<String>(CTX_GOVERNANCE_GUIDANCE)
             .unwrap()

@@ -103,7 +103,10 @@ impl EventReceiver {
             match receiver.recv().await {
                 Ok(event) => return Some(event),
                 Err(broadcast::error::RecvError::Lagged(skipped)) => {
-                    tracing::warn!(skipped = skipped, "Event receiver lagged, some events were dropped");
+                    tracing::warn!(
+                        skipped = skipped,
+                        "Event receiver lagged, some events were dropped"
+                    );
                     continue; // Try again
                 }
                 Err(broadcast::error::RecvError::Closed) => return None,

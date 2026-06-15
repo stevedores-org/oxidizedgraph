@@ -8,7 +8,7 @@ use crate::state::SharedState;
 
 use super::audit::{AuditEventFields, AuditLog, ComplianceExporter, CTX_AUDIT_LOG};
 use super::secrets::{SecretRedactor, CTX_SCOPED_CREDENTIALS};
-use super::slo::{BudgetGuardrail, CostBudget, CTX_COST_BUDGET, CTX_SLO_TRACKER, SloTracker};
+use super::slo::{BudgetGuardrail, CostBudget, SloTracker, CTX_COST_BUDGET, CTX_SLO_TRACKER};
 use super::tenant::{
     Permission, RbacPolicy, RbacSubject, TenantGuard, TenantId, CTX_RBAC_SUBJECT, CTX_TENANT_ID,
 };
@@ -77,11 +77,7 @@ impl NodeExecutor for TenantGuardNode {
             subject.id.clone(),
             "tenant_guard",
             "workflow",
-            if result.allowed {
-                "allowed"
-            } else {
-                "denied"
-            },
+            if result.allowed { "allowed" } else { "denied" },
             detail,
         ));
         guard.set_context(CTX_AUDIT_LOG, audit);
@@ -228,9 +224,7 @@ impl NodeExecutor for SloRecordNode {
             .write()
             .map_err(|e| NodeError::execution_failed(e.to_string()))?;
 
-        let mut tracker: SloTracker = guard
-            .get_context(CTX_SLO_TRACKER)
-            .unwrap_or_default();
+        let mut tracker: SloTracker = guard.get_context(CTX_SLO_TRACKER).unwrap_or_default();
         tracker.record(&self.slo_name, self.success);
         let dashboard = tracker.dashboard();
         guard.set_context(CTX_SLO_TRACKER, tracker);
@@ -272,8 +266,9 @@ impl NodeExecutor for SecretScopeNode {
             .read()
             .map_err(|e| NodeError::execution_failed(e.to_string()))?;
 
-        let credentials: Vec<super::secrets::ScopedCredential> =
-            guard.get_context(CTX_SCOPED_CREDENTIALS).unwrap_or_default();
+        let credentials: Vec<super::secrets::ScopedCredential> = guard
+            .get_context(CTX_SCOPED_CREDENTIALS)
+            .unwrap_or_default();
 
         let has_scope = credentials
             .iter()

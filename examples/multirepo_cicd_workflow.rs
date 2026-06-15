@@ -30,8 +30,8 @@ async fn main() -> anyhow::Result<()> {
         .add_edge_to_end("blocked")
         .compile()?;
 
-    let mut change_graph = CrossRepoChangeGraph::new("issue-27", "run-epic9")
-        .with_plan_id("plan-cross-repo");
+    let mut change_graph =
+        CrossRepoChangeGraph::new("issue-27", "run-epic9").with_plan_id("plan-cross-repo");
     change_graph.add_change(RepoChange::new(
         "infra",
         "stevedores-org/infra-code",
@@ -70,14 +70,23 @@ async fn main() -> anyhow::Result<()> {
 
     let result = traced.invoke(state).await?;
 
-    if let Some(ci) = result.state.get_context::<CiAggregateReport>(CTX_CI_AGGREGATE) {
+    if let Some(ci) = result
+        .state
+        .get_context::<CiAggregateReport>(CTX_CI_AGGREGATE)
+    {
         println!(
             "CI aggregate: passed={} failing={:?} pending={:?}",
             ci.passed, ci.failing_repos, ci.pending_repos
         );
     }
-    if let Some(gate) = result.state.get_context::<ReleaseGateResult>(CTX_RELEASE_GATE) {
-        println!("Release gate: can_release={} reason={}", gate.can_release, gate.reason);
+    if let Some(gate) = result
+        .state
+        .get_context::<ReleaseGateResult>(CTX_RELEASE_GATE)
+    {
+        println!(
+            "Release gate: can_release={} reason={}",
+            gate.can_release, gate.reason
+        );
     }
 
     Ok(())
