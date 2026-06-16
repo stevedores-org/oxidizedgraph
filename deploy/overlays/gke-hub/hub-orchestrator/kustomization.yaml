@@ -7,7 +7,6 @@ resources:
   - ../../../base
 
 patches:
-  - path: serviceaccount-wi.yaml
   - path: deployment-env.yaml
   - path: delete-oxidizedgraph-namespace.yaml
   - path: delete-base-rbac.yaml
