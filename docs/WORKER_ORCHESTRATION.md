@@ -10,6 +10,17 @@ Production GitOps for hub + workers lives in
 (`infrastructure/gke/hub/`). This repo ships a matching kustomize overlay for
 local smoke tests.
 
+## Prerequisites
+
+The `deploy/overlays/gke-hub` overlay assumes the following infrastructure is already in place via [stevedores-org/crossplane-heaven](https://github.com/stevedores-org/crossplane-heaven) (`infrastructure/gke/hub/`):
+
+- **Namespaces**: `Namespace/hub` (orchestrator) and `Namespace/workers` (Job spawning)
+- **ServiceAccount**: `ServiceAccount/adk-agent-worker` in the `workers` namespace
+- **Workload Identity binding**: GSA (`oxidizedgraph@PROJECT_ID.iam.gserviceaccount.com`) to KSA (`adk-agent-worker`/workers) via `google.iam.gke.io/gcp-service-account` annotation
+- **External Secrets**: `ClusterSecretStore/gcp-secret-manager` in `external-secrets-system` (for secret projection to the deployment)
+
+If deploying outside the `hub` cluster, substitute your own crossplane composition or create these resources manually before applying the overlay.
+
 ## Runtime flow
 
 1. Client calls `SendMessage` with a user message describing the build task.
@@ -28,9 +39,9 @@ local smoke tests.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `WORKER_SPAWNER` | `memory` | `memory` for dev/tests, `k8s` in-cluster |
-| `WORKER_NAMESPACE` | `oxidizedgraph` | Namespace for worker Jobs |
+| `WORKER_NAMESPACE` | `oxidizedgraph` | Namespace for worker Jobs (overridden to `workers` in gke-hub overlay) |
 | `WORKER_IMAGE` | crate server image | Worker container image |
-| `WORKER_SERVICE_ACCOUNT` | `oxidizedgraph-worker` | SA for worker pods |
+| `WORKER_SERVICE_ACCOUNT` | `oxidizedgraph-worker` | SA for worker pods (overridden to `adk-agent-worker` in gke-hub overlay) |
 | `WORKER_TTL_SECONDS` | `3600` | Job TTL after finish |
 | `ORCHESTRATOR_URL` | `http://oxidizedgraph:8080` | Callback URL for workers |
 | `ORCHESTRATOR_PUBLIC_URL` | same as bind URL | Used in Agent Card |
