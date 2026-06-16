@@ -10,3 +10,7 @@ spec:
           env:
             - name: WORKER_SPAWNER
               value: k8s
+            - name: WORKER_NAMESPACE
+              value: workers
+            - name: WORKER_SERVICE_ACCOUNT
+              value: adk-agent-worker

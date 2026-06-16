@@ -227,7 +227,7 @@ impl AgentCard {
     pub fn orchestrator(base_url: &str) -> Self {
         Self {
             name: "oxidizedgraph-orchestrator".into(),
-            description: "Sovereign graph orchestrator — dispatches build tasks to ephemeral AKS worker Jobs via A2A JSON-RPC".into(),
+            description: "Sovereign graph orchestrator — dispatches build tasks to ephemeral GKE worker Jobs via A2A JSON-RPC".into(),
             protocol_version: "0.3".into(),
             capabilities: AgentCapabilities {
                 send_message: true,

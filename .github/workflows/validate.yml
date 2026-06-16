@@ -70,8 +70,8 @@ jobs:
       - name: kustomize build (eks overlay)
         run: kustomize build deploy/overlays/eks > /tmp/eks.yaml
 
-      - name: kustomize build (aks-hub overlay)
-        run: kustomize build deploy/overlays/aks-hub > /tmp/aks-hub.yaml
+      - name: kustomize build (gke-hub overlay)
+        run: kustomize build deploy/overlays/gke-hub > /tmp/gke-hub.yaml
 
       - name: Assert EKS overlay uses ECR image and amd64 scheduling
         run: |
@@ -114,8 +114,8 @@ jobs:
       - name: kubeconform — eks overlay
         run: kubeconform -strict -summary -kubernetes-version 1.29.0 /tmp/eks.yaml
 
-      - name: kubeconform — aks-hub overlay
-        run: kubeconform -strict -summary -kubernetes-version 1.29.0 /tmp/aks-hub.yaml
+      - name: kubeconform — gke-hub overlay
+        run: kubeconform -strict -summary -kubernetes-version 1.29.0 /tmp/gke-hub.yaml
 
       - name: kubeconform — worker job template
         run: kubeconform -strict -summary -kubernetes-version 1.29.0 deploy/base/worker-job-template.yaml
