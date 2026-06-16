@@ -12,14 +12,26 @@ local smoke tests.
 
 ## Prerequisites
 
-The `deploy/overlays/gke-hub` overlay assumes the following infrastructure is already in place via [stevedores-org/crossplane-heaven](https://github.com/stevedores-org/crossplane-heaven) (`infrastructure/gke/hub/`):
+The `deploy/overlays/gke-hub` overlay assumes the following infrastructure is already in place:
+
+### Required Resources
 
 - **Namespaces**: `Namespace/hub` (orchestrator) and `Namespace/workers` (Job spawning)
 - **ServiceAccount**: `ServiceAccount/adk-agent-worker` in the `workers` namespace
-- **Workload Identity binding**: GSA (`oxidizedgraph@PROJECT_ID.iam.gserviceaccount.com`) to KSA (`adk-agent-worker`/workers) via `google.iam.gke.io/gcp-service-account` annotation
-- **External Secrets**: `ClusterSecretStore/gcp-secret-manager` in `external-secrets-system` (for secret projection to the deployment)
+- **Workload Identity binding**: GSA (`adk-agent-worker@PROJECT_ID.iam.gserviceaccount.com`) to KSA (`adk-agent-worker`/workers)
+  - The overlay **requires** you to manually add the `google.iam.gke.io/gcp-service-account` annotation to the orchestrator Deployment's Pod spec
+  - Example: `.spec.template.metadata.annotations["google.iam.gke.io/gcp-service-account"] = "adk-agent-worker@PROJECT_ID.iam.gserviceaccount.com"`
 
-If deploying outside the `hub` cluster, substitute your own crossplane composition or create these resources manually before applying the overlay.
+### Optional: Secret Projection
+
+If using External Secrets for automatic secret projection:
+- **ClusterSecretStore**: `ClusterSecretStore/gcp-secret-manager` in `external-secrets-system`
+- Create an `ExternalSecret` resource to project the `github-app-token` Secret into the orchestrator Deployment
+- If not using External Secrets, manually project the Secret via `envFrom` or volume mounts
+
+### For crossplane-heaven users
+
+These resources can be generated via [stevedores-org/crossplane-heaven](https://github.com/stevedores-org/crossplane-heaven) (crossplane compositions in `infrastructure/gke/`). Otherwise, create these resources manually before applying the overlay.
 
 ## Runtime flow
 
