@@ -230,3 +230,126 @@ async fn graph_runner_single_step_with_zero_max_rejects() {
 // is not a registerable node id. The runtime semantics of "END check before
 // iter check" therefore only matter when execution REACHES END after at
 // least one step, which the cases above already cover at the boundary.
+
+// ───────────────────────────────────────────────────────────────────────
+// PR-#99 follow-up: extend the single-step boundary to StreamingRunner and
+// CheckpointingRunner (finding #1 — the module's "all three runners" goal),
+// and prove that max=0 rejects BEFORE the node executes (finding #2 — the
+// runners return Err with no state on RecursionLimit, so an external counter
+// is the only way to verify non-execution).
+// ───────────────────────────────────────────────────────────────────────
+
+/// Single-step graph whose node bumps `counter` each time it runs.
+fn single_step_graph_counting(
+    counter: Arc<std::sync::atomic::AtomicUsize>,
+) -> oxidizedgraph::graph::CompiledGraph {
+    GraphBuilder::new()
+        .add_node(oxidizedgraph::nodes::FunctionNode::new(
+            "only",
+            move |_state| {
+                let counter = counter.clone();
+                async move {
+                    counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    Ok(NodeOutput::finish())
+                }
+            },
+        ))
+        .set_entry_point("only")
+        .compile()
+        .expect("counting single-step graph compiles")
+}
+
+#[tokio::test]
+async fn streaming_runner_single_step_with_exact_max_completes() {
+    let runner = oxidizedgraph::events::StreamingRunner::new(
+        single_step_graph(),
+        Arc::new(oxidizedgraph::events::EventBus::new()),
+    )
+    .with_config(RunnerConfig::new().max_iterations(1));
+    let result = runner
+        .invoke("ss-stream", AgentState::new())
+        .await
+        .expect("single-step exact-iter must complete");
+    let oxidizedgraph::events::StreamingRunResult::Completed(state) = result else {
+        panic!("expected Completed, got {result:?}");
+    };
+    assert_eq!(state.get_context::<bool>("reached_only"), Some(true));
+}
+
+#[tokio::test]
+async fn checkpointing_runner_single_step_with_exact_max_completes() {
+    let checkpointer = Arc::new(oxidizedgraph::checkpoint::MemoryCheckpointer::new());
+    let runner =
+        oxidizedgraph::checkpoint::CheckpointingRunner::new(single_step_graph(), checkpointer)
+            .with_config(RunnerConfig::new().max_iterations(1));
+    let result = runner
+        .invoke("ss-ckpt", AgentState::new())
+        .await
+        .expect("single-step exact-iter must complete");
+    assert!(matches!(
+        result,
+        oxidizedgraph::checkpoint::RunResult::Completed(_)
+    ));
+    assert_eq!(
+        result.state().get_context::<bool>("reached_only"),
+        Some(true)
+    );
+}
+
+#[tokio::test]
+async fn graph_runner_zero_max_does_not_execute_node() {
+    let counter = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let runner = oxidizedgraph::runner::GraphRunner::new(
+        single_step_graph_counting(counter.clone()),
+        RunnerConfig::new().max_iterations(0),
+    );
+    let err = runner.invoke(AgentState::new()).await.unwrap_err();
+    assert!(matches!(
+        err,
+        oxidizedgraph::error::RuntimeError::RecursionLimit(0)
+    ));
+    assert_eq!(
+        counter.load(std::sync::atomic::Ordering::SeqCst),
+        0,
+        "max=0 must reject before the node executes"
+    );
+}
+
+#[tokio::test]
+async fn streaming_runner_single_step_with_zero_max_rejects_without_running() {
+    let counter = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let runner = oxidizedgraph::events::StreamingRunner::new(
+        single_step_graph_counting(counter.clone()),
+        Arc::new(oxidizedgraph::events::EventBus::new()),
+    )
+    .with_config(RunnerConfig::new().max_iterations(0));
+    let err = runner
+        .invoke("ss-stream-0", AgentState::new())
+        .await
+        .unwrap_err();
+    assert!(matches!(
+        err,
+        oxidizedgraph::error::RuntimeError::RecursionLimit(0)
+    ));
+    assert_eq!(counter.load(std::sync::atomic::Ordering::SeqCst), 0);
+}
+
+#[tokio::test]
+async fn checkpointing_runner_single_step_with_zero_max_rejects_without_running() {
+    let counter = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let checkpointer = Arc::new(oxidizedgraph::checkpoint::MemoryCheckpointer::new());
+    let runner = oxidizedgraph::checkpoint::CheckpointingRunner::new(
+        single_step_graph_counting(counter.clone()),
+        checkpointer,
+    )
+    .with_config(RunnerConfig::new().max_iterations(0));
+    let err = runner
+        .invoke("ss-ckpt-0", AgentState::new())
+        .await
+        .unwrap_err();
+    assert!(matches!(
+        err,
+        oxidizedgraph::error::RuntimeError::RecursionLimit(0)
+    ));
+    assert_eq!(counter.load(std::sync::atomic::Ordering::SeqCst), 0);
+}
