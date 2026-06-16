@@ -191,6 +191,22 @@ impl<C: Checkpointer> CheckpointingRunner<C> {
         );
 
         loop {
+            // Check for END node
+            if current_node == transitions::END {
+                info!(
+                    thread_id = %thread_id,
+                    iterations = iterations,
+                    "Graph execution completed"
+                );
+
+                let final_state = state
+                    .read()
+                    .map_err(|e| RuntimeError::InvalidState(e.to_string()))?
+                    .clone();
+
+                return Ok(RunResult::Completed(final_state));
+            }
+
             // Check iteration limit
             if iterations >= self.config.max_iterations {
                 warn!(
@@ -209,22 +225,6 @@ impl<C: Checkpointer> CheckpointingRunner<C> {
                 self.checkpointer.save(checkpoint).await?;
 
                 return Err(RuntimeError::RecursionLimit(self.config.max_iterations));
-            }
-
-            // Check for END node
-            if current_node == transitions::END {
-                info!(
-                    thread_id = %thread_id,
-                    iterations = iterations,
-                    "Graph execution completed"
-                );
-
-                let final_state = state
-                    .read()
-                    .map_err(|e| RuntimeError::InvalidState(e.to_string()))?
-                    .clone();
-
-                return Ok(RunResult::Completed(final_state));
             }
 
             // Get the current node
