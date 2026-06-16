@@ -356,6 +356,7 @@ impl GraphBuilder {
         // Build the petgraph structure using StableGraph for stable node indices
         let mut graph = StableGraph::new();
         let mut node_indices: HashMap<String, NodeIndex> = HashMap::new();
+        let mut outgoing_edges: HashMap<String, Vec<usize>> = HashMap::new();
 
         // Add all nodes
         for (id, node) in &self.nodes {
@@ -372,7 +373,7 @@ impl GraphBuilder {
         node_indices.insert(transitions::END.to_string(), end_idx);
 
         // Add all edges
-        for edge in &self.edges {
+        for (edge_index, edge) in self.edges.iter().enumerate() {
             let from_idx = node_indices
                 .get(&edge.from)
                 .ok_or_else(|| GraphError::NodeNotFound(edge.from.clone()))?;
@@ -384,12 +385,17 @@ impl GraphBuilder {
                     .ok_or_else(|| GraphError::NodeNotFound(edge.to.clone()))?;
                 graph.add_edge(*from_idx, *to_idx, edge.clone());
             }
+
+            outgoing_edges
+                .entry(edge.from.clone())
+                .or_default()
+                .push(edge_index);
         }
 
         Ok(CompiledGraph {
             graph,
             node_indices,
-            edge_routes: build_edge_routes(&self.edges),
+            outgoing_edges,
             edges: self.edges,
             entry_point: entry,
             name: self.name,
@@ -407,17 +413,11 @@ impl GraphBuilder {
 pub struct CompiledGraph {
     pub(crate) graph: StableGraph<GraphNode, GraphEdge>,
     pub(crate) node_indices: HashMap<String, NodeIndex>,
-    pub(crate) edge_routes: HashMap<String, GraphEdgeRoutes>,
+    pub(crate) outgoing_edges: HashMap<String, Vec<usize>>,
     pub(crate) edges: Vec<GraphEdge>,
     pub(crate) entry_point: String,
     pub(crate) name: Option<String>,
     pub(crate) description: Option<String>,
-}
-
-#[derive(Clone, Default)]
-pub(crate) struct GraphEdgeRoutes {
-    keyed: HashMap<String, GraphEdge>,
-    default: Option<GraphEdge>,
 }
 
 impl CompiledGraph {
@@ -445,16 +445,31 @@ impl CompiledGraph {
         state: &AgentState,
         transition_key: &str,
     ) -> Option<String> {
-        if let Some(routes) = self.edge_routes.get(from) {
-            if let Some(edge) = routes.keyed.get(transition_key) {
-                return resolve_edge(edge, state);
-            }
+        let edge_indices = self.outgoing_edges.get(from)?;
 
-            // Backward compatibility: unkeyed edges are default CONTINUE path.
-            if transition_key == transitions::CONTINUE {
-                if let Some(edge) = routes.default.as_ref() {
-                    return resolve_edge(edge, state);
+        // First, exact transition-key match.
+        for edge_index in edge_indices {
+            let edge = &self.edges[*edge_index];
+            if edge.transition_key.as_deref() != Some(transition_key) {
+                continue;
+            }
+            return match &edge.edge_type {
+                EdgeType::Direct => Some(edge.to.clone()),
+                EdgeType::Conditional(router) => Some(router(state)),
+            };
+        }
+
+        // Backward compatibility: unkeyed edges are default CONTINUE path.
+        if transition_key == transitions::CONTINUE {
+            for edge_index in edge_indices {
+                let edge = &self.edges[*edge_index];
+                if edge.transition_key.is_some() {
+                    continue;
                 }
+                return match &edge.edge_type {
+                    EdgeType::Direct => Some(edge.to.clone()),
+                    EdgeType::Conditional(router) => Some(router(state)),
+                };
             }
         }
 
@@ -469,6 +484,11 @@ impl CompiledGraph {
     /// Get the graph description
     pub fn description(&self) -> Option<&str> {
         self.description.as_deref()
+    }
+
+    /// Get the graph edges in insertion order.
+    pub fn edges(&self) -> &[GraphEdge] {
+        &self.edges
     }
 
     /// Generate a Mermaid diagram of the graph
@@ -506,34 +526,6 @@ impl CompiledGraph {
 
         output
     }
-}
-
-fn resolve_edge(edge: &GraphEdge, state: &AgentState) -> Option<String> {
-    match &edge.edge_type {
-        EdgeType::Direct => Some(edge.to.clone()),
-        EdgeType::Conditional(router) => Some(router(state)),
-    }
-}
-
-fn build_edge_routes(edges: &[GraphEdge]) -> HashMap<String, GraphEdgeRoutes> {
-    let mut routes: HashMap<String, GraphEdgeRoutes> = HashMap::new();
-
-    for edge in edges {
-        let entry = routes.entry(edge.from.clone()).or_default();
-        match edge.transition_key.as_deref() {
-            Some(key) => {
-                entry
-                    .keyed
-                    .entry(key.to_string())
-                    .or_insert_with(|| edge.clone());
-            }
-            None => {
-                entry.default.get_or_insert_with(|| edge.clone());
-            }
-        }
-    }
-
-    routes
 }
 
 /// Internal END node that terminates execution
