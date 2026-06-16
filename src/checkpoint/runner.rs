@@ -204,6 +204,9 @@ impl<C: Checkpointer> CheckpointingRunner<C> {
                     .map_err(|e| RuntimeError::InvalidState(e.to_string()))?
                     .clone();
 
+                let checkpoint = Checkpoint::new(thread_id, &current_node, final_state.clone());
+                self.checkpointer.save(checkpoint).await?;
+
                 return Ok(RunResult::Completed(final_state));
             }
 
@@ -420,7 +423,10 @@ mod tests {
 
         // Verify checkpoints were saved
         let history = checkpointer.list("thread-1").await.unwrap();
-        assert_eq!(history.len(), 2);
+        assert_eq!(history.len(), 3);
+        assert_eq!(history[0].node_id, transitions::END);
+        assert_eq!(history[1].node_id, "second");
+        assert_eq!(history[2].node_id, "first");
     }
 
     #[tokio::test]
@@ -459,6 +465,35 @@ mod tests {
         assert!(result.is_completed());
         // Should have run all three nodes again
         assert_eq!(result.state().get_context::<i32>("count"), Some(3));
+    }
+
+    #[tokio::test]
+    async fn test_resume_from_terminal_checkpoint() {
+        let graph = GraphBuilder::new()
+            .add_node(CounterNode {
+                id: "first".to_string(),
+                next: Some("second".to_string()),
+            })
+            .add_node(CounterNode {
+                id: "second".to_string(),
+                next: None,
+            })
+            .set_entry_point("first")
+            .compile()
+            .unwrap();
+
+        let checkpointer = Arc::new(MemoryCheckpointer::new());
+        let runner = CheckpointingRunner::new(graph, checkpointer.clone()).checkpoint_every_node();
+
+        let completed = runner.invoke("thread-1", AgentState::new()).await.unwrap();
+        assert!(completed.is_completed());
+
+        let latest = checkpointer.load("thread-1").await.unwrap().unwrap();
+        assert_eq!(latest.node_id, transitions::END);
+
+        let resumed = runner.resume("thread-1").await.unwrap();
+        assert!(resumed.is_completed());
+        assert_eq!(resumed.state().get_context::<i32>("count"), Some(2));
     }
 
     #[tokio::test]
