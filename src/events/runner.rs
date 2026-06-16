@@ -183,6 +183,29 @@ impl<C: Checkpointer> StreamingRunner<C> {
         ));
 
         loop {
+            // Check for END node
+            if current_node == transitions::END {
+                let duration = graph_start.elapsed();
+
+                // Emit graph completed event
+                self.event_bus
+                    .publish(Event::graph_completed(thread_id, iterations, duration));
+
+                info!(
+                    thread_id = %thread_id,
+                    iterations = iterations,
+                    duration_ms = duration.as_millis(),
+                    "Graph execution completed"
+                );
+
+                let final_state = state
+                    .read()
+                    .map_err(|e| RuntimeError::InvalidState(e.to_string()))?
+                    .clone();
+
+                return Ok(StreamingRunResult::Completed(final_state));
+            }
+
             // Check iteration limit
             if iterations >= self.config.max_iterations {
                 warn!(
@@ -211,29 +234,6 @@ impl<C: Checkpointer> StreamingRunner<C> {
                 }
 
                 return Err(RuntimeError::RecursionLimit(self.config.max_iterations));
-            }
-
-            // Check for END node
-            if current_node == transitions::END {
-                let duration = graph_start.elapsed();
-
-                // Emit graph completed event
-                self.event_bus
-                    .publish(Event::graph_completed(thread_id, iterations, duration));
-
-                info!(
-                    thread_id = %thread_id,
-                    iterations = iterations,
-                    duration_ms = duration.as_millis(),
-                    "Graph execution completed"
-                );
-
-                let final_state = state
-                    .read()
-                    .map_err(|e| RuntimeError::InvalidState(e.to_string()))?
-                    .clone();
-
-                return Ok(StreamingRunResult::Completed(final_state));
             }
 
             // Get the current node
