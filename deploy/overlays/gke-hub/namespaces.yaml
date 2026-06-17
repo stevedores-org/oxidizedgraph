@@ -1,0 +1,14 @@
+# The hub overlay deletes the base `oxidizedgraph` namespace and runs the
+# orchestrator in `hub`, spawning worker Jobs in `workers`. In production these
+# namespaces are created by GitOps (crossplane-heaven). Declaring them here too
+# makes `kustomize build deploy/overlays/gke-hub | kubectl apply -f -` self-
+# contained for local smoke tests instead of failing on missing namespaces.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: hub
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: workers
