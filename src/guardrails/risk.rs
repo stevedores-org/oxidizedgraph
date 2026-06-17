@@ -89,16 +89,36 @@ impl RiskClassifier {
     }
 
     /// Transition key for routing after risk evaluation (matches graph edge keys).
+    ///
+    /// Returns one of the [`route`] constants. Graph wiring should reference
+    /// those same constants in `add_edge_with_key` rather than hand-typing the
+    /// strings, so the routing contract has a single source of truth.
     pub fn approval_route(risk: RiskLevel, gates_passed: bool) -> &'static str {
         if !gates_passed {
-            return "gate_failed";
+            return route::GATE_FAILED;
         }
         match risk {
-            RiskLevel::High => "needs_approval",
-            RiskLevel::Medium => "review",
-            RiskLevel::Low => "passed",
+            RiskLevel::High => route::NEEDS_APPROVAL,
+            RiskLevel::Medium => route::REVIEW,
+            RiskLevel::Low => route::PASSED,
         }
     }
+}
+
+/// Transition keys emitted by [`RiskClassifier::approval_route`].
+///
+/// Exposed so graph builders can wire edges against the same constants the
+/// classifier returns, instead of duplicating free-form string literals that
+/// silently fall through to `END` on a typo.
+pub mod route {
+    /// One or more required gates failed.
+    pub const GATE_FAILED: &str = "gate_failed";
+    /// Gates passed but the change is high-risk and needs human approval.
+    pub const NEEDS_APPROVAL: &str = "needs_approval";
+    /// Gates passed, medium-risk — route to optional review.
+    pub const REVIEW: &str = "review";
+    /// Gates passed, low-risk — safe to proceed.
+    pub const PASSED: &str = "passed";
 }
 
 #[cfg(test)]

@@ -1,10 +1,10 @@
 //! Graph runner that records transitions and validates state.
 
 use std::sync::{Arc, RwLock};
-use tracing::{debug, info, instrument, warn};
+use tracing::{debug, info, instrument};
 
 use crate::error::RuntimeError;
-use crate::graph::{transitions, CompiledGraph, NodeOutput};
+use crate::graph::{transitions, CompiledGraph};
 use crate::runner::RunnerConfig;
 use crate::state::AgentState;
 
@@ -85,6 +85,17 @@ impl TracedRunner {
                 .map_err(|e| RuntimeError::InvalidState(e.to_string()))?;
         }
 
+        // Reset the log so each invocation's result contains only this run's
+        // records. `invoke` takes `&self`, so a runner can be reused; without
+        // this clear, run B's TracedRunResult would carry run A's transitions.
+        {
+            let mut log = self
+                .transition_log
+                .write()
+                .map_err(|e| RuntimeError::InvalidState(e.to_string()))?;
+            log.clear();
+        }
+
         let state = Arc::new(RwLock::new(initial_state));
         let final_state = self.run_loop(state).await?;
 
@@ -153,7 +164,13 @@ impl TracedRunner {
                     .map_err(|e: ValidationError| RuntimeError::InvalidState(e.to_string()))?;
             }
 
-            let next_node = self.resolve_next(&current_node, &output, &state)?;
+            let next_node = {
+                let current_state = state
+                    .read()
+                    .map_err(|e| RuntimeError::InvalidState(e.to_string()))?;
+                self.graph
+                    .resolve_next_node(&current_node, &output, &current_state)
+            };
             let state_iteration = state
                 .read()
                 .map_err(|e| RuntimeError::InvalidState(e.to_string()))?
@@ -184,50 +201,13 @@ impl TracedRunner {
             current_node = next_node;
         }
     }
-
-    fn resolve_next(
-        &self,
-        current_node: &str,
-        output: &NodeOutput,
-        state: &Arc<RwLock<AgentState>>,
-    ) -> Result<String, RuntimeError> {
-        let next = match output {
-            NodeOutput::Finish => transitions::END.to_string(),
-            NodeOutput::Continue(Some(target)) => target.clone(),
-            NodeOutput::Continue(None) => {
-                let current_state = state
-                    .read()
-                    .map_err(|e| RuntimeError::InvalidState(e.to_string()))?;
-                self.graph
-                    .get_next_node_for_transition(
-                        current_node,
-                        &current_state,
-                        transitions::CONTINUE,
-                    )
-                    .unwrap_or_else(|| transitions::END.to_string())
-            }
-            NodeOutput::Route(target) => target.clone(),
-            NodeOutput::Transition(key) => {
-                let current_state = state
-                    .read()
-                    .map_err(|e| RuntimeError::InvalidState(e.to_string()))?;
-                self.graph
-                    .get_next_node_for_transition(current_node, &current_state, key)
-                    .unwrap_or_else(|| {
-                        warn!(node = %current_node, key = %key, "No edge for transition");
-                        transitions::END.to_string()
-                    })
-            }
-        };
-        Ok(next)
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::error::NodeError;
-    use crate::graph::{GraphBuilder, NodeExecutor};
+    use crate::graph::{GraphBuilder, NodeExecutor, NodeOutput};
     use crate::state::SharedState;
     use async_trait::async_trait;
 

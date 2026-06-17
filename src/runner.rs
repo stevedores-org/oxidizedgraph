@@ -7,7 +7,7 @@ use std::sync::{Arc, RwLock};
 use tracing::{debug, info, instrument, warn};
 
 use crate::error::RuntimeError;
-use crate::graph::{transitions, CompiledGraph, NodeOutput};
+use crate::graph::{transitions, CompiledGraph};
 use crate::state::AgentState;
 
 /// Configuration for the graph runner
@@ -156,67 +156,16 @@ impl GraphRunner {
 
             iterations += 1;
 
-            // Determine next node based on output
-            let next_node = match &output {
-                NodeOutput::Finish => {
-                    info!(node_id = %current_node, "Node signaled finish");
-                    transitions::END.to_string()
-                }
-                NodeOutput::Continue(Some(target)) => {
-                    debug!(node_id = %current_node, target = %target, "Node specified next target");
-                    target.clone()
-                }
-                NodeOutput::Continue(None) => {
-                    // Look up edge from graph
-                    let current_state = state
-                        .read()
-                        .map_err(|e| RuntimeError::InvalidState(e.to_string()))?;
-                    match self.graph.get_next_node_for_transition(
-                        &current_node,
-                        &current_state,
-                        transitions::CONTINUE,
-                    ) {
-                        Some(next) => {
-                            debug!(node_id = %current_node, next = %next, "Following graph edge");
-                            next
-                        }
-                        None => {
-                            debug!(
-                                node_id = %current_node,
-                                "No outgoing edge, ending execution"
-                            );
-                            transitions::END.to_string()
-                        }
-                    }
-                }
-                NodeOutput::Route(target) => {
-                    debug!(node_id = %current_node, target = %target, "Node routing to target");
-                    target.clone()
-                }
-                NodeOutput::Transition(key) => {
-                    let current_state = state
-                        .read()
-                        .map_err(|e| RuntimeError::InvalidState(e.to_string()))?;
-                    match self.graph.get_next_node_for_transition(
-                        &current_node,
-                        &current_state,
-                        key,
-                    ) {
-                        Some(next) => {
-                            debug!(node_id = %current_node, transition = %key, next = %next, "Following keyed graph edge");
-                            next
-                        }
-                        None => {
-                            debug!(
-                                node_id = %current_node,
-                                transition = %key,
-                                "No outgoing edge for transition, ending execution"
-                            );
-                            transitions::END.to_string()
-                        }
-                    }
-                }
+            // Determine next node based on output (shared resolution logic —
+            // see CompiledGraph::resolve_next_node).
+            let next_node = {
+                let current_state = state
+                    .read()
+                    .map_err(|e| RuntimeError::InvalidState(e.to_string()))?;
+                self.graph
+                    .resolve_next_node(&current_node, &output, &current_state)
             };
+            debug!(node_id = %current_node, next = %next_node, "Resolved next node");
 
             current_node = next_node;
         }
@@ -240,7 +189,7 @@ pub type Runtime = GraphRunner;
 mod tests {
     use super::*;
     use crate::error::NodeError;
-    use crate::graph::{GraphBuilder, NodeExecutor};
+    use crate::graph::{GraphBuilder, NodeExecutor, NodeOutput};
     use crate::state::SharedState;
     use async_trait::async_trait;
 

@@ -461,6 +461,31 @@ impl CompiledGraph {
         None
     }
 
+    /// Resolve the next node id from a node's output.
+    ///
+    /// Single source of truth for output→next-node routing, shared by every
+    /// runner (`GraphRunner`, `TracedRunner`). Keeping the five-arm match and
+    /// the END fallback here means a routing fix lands once instead of having
+    /// to be mirrored across each runner's loop.
+    pub fn resolve_next_node(
+        &self,
+        current_node: &str,
+        output: &NodeOutput,
+        state: &AgentState,
+    ) -> String {
+        match output {
+            NodeOutput::Finish => transitions::END.to_string(),
+            NodeOutput::Continue(Some(target)) => target.clone(),
+            NodeOutput::Continue(None) => self
+                .get_next_node_for_transition(current_node, state, transitions::CONTINUE)
+                .unwrap_or_else(|| transitions::END.to_string()),
+            NodeOutput::Route(target) => target.clone(),
+            NodeOutput::Transition(key) => self
+                .get_next_node_for_transition(current_node, state, key)
+                .unwrap_or_else(|| transitions::END.to_string()),
+        }
+    }
+
     /// Get the graph name
     pub fn name(&self) -> Option<&str> {
         self.name.as_deref()
