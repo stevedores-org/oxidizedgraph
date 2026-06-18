@@ -69,10 +69,10 @@ pub use crate::guardrails::{
 pub use crate::governance::{
     agent_role_from_state, apply_role_guidance, compose_guidance, load_manifest,
     role_system_prompt, tool_policy_for_role, tool_policy_for_state, AgentRole, GovernanceConfig,
-    GovernanceError, GovernanceNode, RoleGuidance, RoleHandoffNode, RoleRouterNode,
-    RoleTargetRouterNode, SymlinkManager, SymlinkStatus, GovernanceValidator,
-    ManifestError, ValidationError, CTX_AGENT_ROLE, CTX_GOVERNANCE_GUIDANCE,
-    CTX_ROLE_SYSTEM_PROMPT, CTX_TOOL_POLICY_ROLE,
+    GovernanceError, GovernanceNode, GovernanceValidator, ManifestError, RoleGuidance,
+    RoleHandoffNode, RoleRouterNode, RoleTargetRouterNode, SymlinkManager, SymlinkStatus,
+    ValidationError, CTX_AGENT_ROLE, CTX_GOVERNANCE_GUIDANCE, CTX_ROLE_SYSTEM_PROMPT,
+    CTX_TOOL_POLICY_ROLE,
 };
 
 // Planning and autonomy (roadmap EPIC6/EPIC7)

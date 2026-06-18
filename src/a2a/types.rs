@@ -78,9 +78,7 @@ impl Message {
     pub fn user_text(text: impl Into<String>) -> Self {
         Self {
             role: Role::RoleUser,
-            parts: vec![MessagePart {
-                text: text.into(),
-            }],
+            parts: vec![MessagePart { text: text.into() }],
             message_id: Uuid::new_v4().to_string(),
             task_id: None,
             context_id: None,
@@ -229,7 +227,7 @@ impl AgentCard {
     pub fn orchestrator(base_url: &str) -> Self {
         Self {
             name: "oxidizedgraph-orchestrator".into(),
-            description: "Sovereign graph orchestrator — dispatches build tasks to ephemeral AKS worker Jobs via A2A JSON-RPC".into(),
+            description: "Sovereign graph orchestrator — dispatches build tasks to ephemeral GKE worker Jobs via A2A JSON-RPC".into(),
             protocol_version: "0.3".into(),
             capabilities: AgentCapabilities {
                 send_message: true,

@@ -1,4 +1,4 @@
-//! Ephemeral worker Job orchestration for AKS (issue #41).
+//! Ephemeral worker Job orchestration on GKE (issue #41).
 //!
 //! The orchestrator spawns one `batch/v1.Job` per build task. Workers receive
 //! task metadata via environment variables and report back over A2A JSON-RPC.

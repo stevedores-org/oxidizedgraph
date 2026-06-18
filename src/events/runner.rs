@@ -183,6 +183,45 @@ impl<C: Checkpointer> StreamingRunner<C> {
         ));
 
         loop {
+            // Check for END node
+            if current_node == transitions::END {
+                let duration = graph_start.elapsed();
+
+                // Emit graph completed event
+                self.event_bus
+                    .publish(Event::graph_completed(thread_id, iterations, duration));
+
+                info!(
+                    thread_id = %thread_id,
+                    iterations = iterations,
+                    duration_ms = duration.as_millis(),
+                    "Graph execution completed"
+                );
+
+                let final_state = state
+                    .read()
+                    .map_err(|e| RuntimeError::InvalidState(e.to_string()))?
+                    .clone();
+
+                if self.checkpoint_config.checkpoint_every_node {
+                    if let Some(ref checkpointer) = self.checkpointer {
+                        let checkpoint =
+                            Checkpoint::new(thread_id, &current_node, final_state.clone());
+                        let checkpoint_id = checkpoint.id.clone();
+                        checkpointer.save(checkpoint).await?;
+
+                        // Emit checkpoint saved event for the terminal state.
+                        self.event_bus.publish(Event::checkpoint_saved(
+                            thread_id,
+                            checkpoint_id,
+                            current_node.clone(),
+                        ));
+                    }
+                }
+
+                return Ok(StreamingRunResult::Completed(final_state));
+            }
+
             // Check iteration limit
             if iterations >= self.config.max_iterations {
                 warn!(
@@ -211,29 +250,6 @@ impl<C: Checkpointer> StreamingRunner<C> {
                 }
 
                 return Err(RuntimeError::RecursionLimit(self.config.max_iterations));
-            }
-
-            // Check for END node
-            if current_node == transitions::END {
-                let duration = graph_start.elapsed();
-
-                // Emit graph completed event
-                self.event_bus
-                    .publish(Event::graph_completed(thread_id, iterations, duration));
-
-                info!(
-                    thread_id = %thread_id,
-                    iterations = iterations,
-                    duration_ms = duration.as_millis(),
-                    "Graph execution completed"
-                );
-
-                let final_state = state
-                    .read()
-                    .map_err(|e| RuntimeError::InvalidState(e.to_string()))?
-                    .clone();
-
-                return Ok(StreamingRunResult::Completed(final_state));
             }
 
             // Get the current node
@@ -485,7 +501,41 @@ mod tests {
 
         // Verify checkpoint was saved
         let history = checkpointer.list("thread-1").await.unwrap();
-        assert_eq!(history.len(), 1);
+        assert_eq!(history.len(), 2);
+        assert_eq!(history[0].node_id, transitions::END);
+        assert_eq!(history[1].node_id, "node");
+    }
+
+    #[tokio::test]
+    async fn test_streaming_resume_from_terminal_checkpoint() {
+        let graph = GraphBuilder::new()
+            .add_node(CounterNode {
+                id: "first".to_string(),
+                next: Some("second".to_string()),
+            })
+            .add_node(CounterNode {
+                id: "second".to_string(),
+                next: None,
+            })
+            .set_entry_point("first")
+            .compile()
+            .unwrap();
+
+        let bus = Arc::new(EventBus::new());
+        let checkpointer = Arc::new(MemoryCheckpointer::new());
+
+        let runner = StreamingRunner::with_checkpointer(graph, bus, checkpointer.clone())
+            .checkpoint_every_node();
+
+        let completed = runner.invoke("thread-1", AgentState::new()).await.unwrap();
+        assert!(completed.is_completed());
+
+        let latest = checkpointer.load("thread-1").await.unwrap().unwrap();
+        assert_eq!(latest.node_id, transitions::END);
+
+        let resumed = runner.resume("thread-1").await.unwrap();
+        assert!(resumed.is_completed());
+        assert_eq!(resumed.state().get_context::<i32>("count"), Some(2));
     }
 
     #[tokio::test]

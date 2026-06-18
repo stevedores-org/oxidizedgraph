@@ -20,9 +20,11 @@ permissions:
   contents: read
 
 env:
-  AWS_REGION: us-east-2
-  ECR_REGISTRY: 148080843892.dkr.ecr.us-east-2.amazonaws.com
-  ECR_REPOSITORY: stevedores-org/oxidizedgraph/server
+  # GAR (GKE-only fleet; AKS/EKS + ECR retired). Matches the registry used by
+  # lornu-ai/dockworker.ai rust-backend and brains.
+  GAR_LOCATION: us-central1
+  GAR_REGISTRY: us-central1-docker.pkg.dev
+  GAR_REPOSITORY: gcp-lornu-ai/lornu-ai/oxidizedgraph-server
 
 jobs:
   rust:
@@ -68,8 +70,8 @@ jobs:
       - name: kustomize build (eks overlay)
         run: kustomize build deploy/overlays/eks > /tmp/eks.yaml
 
-      - name: kustomize build (aks-hub overlay)
-        run: kustomize build deploy/overlays/aks-hub > /tmp/aks-hub.yaml
+      - name: kustomize build (gke-hub overlay)
+        run: kustomize build deploy/overlays/gke-hub > /tmp/gke-hub.yaml
 
       - name: Assert EKS overlay uses ECR image and amd64 scheduling
         run: |
@@ -112,8 +114,8 @@ jobs:
       - name: kubeconform — eks overlay
         run: kubeconform -strict -summary -kubernetes-version 1.29.0 /tmp/eks.yaml
 
-      - name: kubeconform — aks-hub overlay
-        run: kubeconform -strict -summary -kubernetes-version 1.29.0 /tmp/aks-hub.yaml
+      - name: kubeconform — gke-hub overlay
+        run: kubeconform -strict -summary -kubernetes-version 1.29.0 /tmp/gke-hub.yaml
 
       - name: kubeconform — worker job template
         run: kubeconform -strict -summary -kubernetes-version 1.29.0 deploy/base/worker-job-template.yaml
@@ -133,31 +135,32 @@ jobs:
       - name: build server-image
         run: nix build .#server-image -L --no-link
 
-  publish-ecr-preflight:
-    name: publish-ecr preflight
+  publish-gar-preflight:
+    name: publish-gar preflight
     # Runs unconditionally on push-to-main so a missing repo variable is a
-    # loud CI failure, not a silent skip of `publish-ecr`. The actual
+    # loud CI failure, not a silent skip of `publish-gar`. The actual
     # publish job's `if:` gate stays in place to short-circuit feature PRs.
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
-      - name: Verify AWS_OIDC_ROLE_ARN is set
+      - name: Verify GCP_WIF_PROVIDER and GCP_WIF_SERVICE_ACCOUNT are set
         env:
-          ROLE_ARN: ${{ vars.AWS_OIDC_ROLE_ARN }}
+          WIF_PROVIDER: ${{ vars.GCP_WIF_PROVIDER }}
+          WIF_SA: ${{ vars.GCP_WIF_SERVICE_ACCOUNT }}
         run: |
-          if [[ -z "$ROLE_ARN" ]]; then
-            echo "::error::AWS_OIDC_ROLE_ARN repo variable is empty. publish-ecr will be silently skipped. Configure the variable to enable publishing — see docs/DEPLOY_GKE.md."
+          if [[ -z "$WIF_PROVIDER" || -z "$WIF_SA" ]]; then
+            echo "::error::GCP_WIF_PROVIDER / GCP_WIF_SERVICE_ACCOUNT repo variables are empty. publish-gar will be silently skipped. Configure them (and grant the SA Artifact Registry Writer on ${GAR_REPOSITORY%%/*}) to enable publishing — see docs/DEPLOY_GKE.md."
             exit 1
           fi
-          echo "✓ AWS_OIDC_ROLE_ARN is set; publish-ecr will run."
+          echo "✓ GCP WIF variables set; publish-gar will run."
 
-  publish-ecr:
-    name: publish linux/amd64 image to ECR
-    needs: [nix, publish-ecr-preflight]
+  publish-gar:
+    name: publish linux/amd64 image to GAR
+    needs: [nix, publish-gar-preflight]
     # Use vars (not secrets) — secrets can't be referenced in job-level `if`.
     # The preflight job above turns a missing variable into a visible failure;
     # this gate still short-circuits non-main pushes and PR runs.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.AWS_OIDC_ROLE_ARN != ''
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.GCP_WIF_PROVIDER != '' && vars.GCP_WIF_SERVICE_ACCOUNT != ''
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -165,19 +168,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Configure AWS credentials (OIDC)
-        # SHA-pinned per security policy — floating @v4 lets a compromised
-        # release of this action mint AWS credentials on our behalf. Bump
+      - name: Authenticate to Google Cloud (OIDC)
+        id: auth
+        # SHA-pinned per security policy — floating @v2 lets a compromised
+        # release of this action mint GCP credentials on our behalf. Bump
         # via Dependabot; comment carries the human-readable version.
-        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
+        uses: google-github-actions/auth@6fc4af4b145ae7821d527454aa9bd537d1f2dc5f # v2.1.7
         with:
-          role-to-assume: ${{ vars.AWS_OIDC_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-          # Explicit audience so a future trust-policy reshuffle has the
-          # matching value at hand. `sts.amazonaws.com` is the action's
-          # default; declaring it makes the contract visible.
-          audience: sts.amazonaws.com
-          role-session-name: oxidizedgraph-publish-ecr-${{ github.run_id }}-${{ github.run_attempt }}
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_WIF_SERVICE_ACCOUNT }}
+          token_format: access_token
 
       - uses: cachix/install-nix-action@v27
         with:
@@ -190,15 +190,14 @@ jobs:
       - name: Install skopeo
         run: sudo apt-get update -qq && sudo apt-get install -y -qq skopeo
 
-      - name: Ensure ECR repository exists
-        run: |
-          aws ecr describe-repositories --repository-names "$ECR_REPOSITORY" >/dev/null 2>&1 \
-            || aws ecr create-repository --repository-name "$ECR_REPOSITORY"
+      # NOTE: the GAR repository (gcp-lornu-ai/lornu-ai) is provisioned out of
+      # band (infra-code), unlike the old `aws ecr create-repository` step —
+      # skopeo can't create GAR repos. The push fails loudly if it's missing.
 
       - name: Build OCI image (linux/amd64)
         run: nix build .#server-image -o result -L
 
-      - name: Push to ECR
+      - name: Push to GAR
         run: |
           mkdir -p ~/.config/containers
           printf '%s\n' '{"default":[{"type":"insecureAcceptAnything"}]}' > ~/.config/containers/policy.json
@@ -212,10 +211,10 @@ jobs:
             echo "::error::Failed to parse package version from cargo metadata"
             exit 1
           fi
-          IMAGE="${ECR_REGISTRY}/${ECR_REPOSITORY}"
+          IMAGE="${GAR_REGISTRY}/${GAR_REPOSITORY}"
           TAG_SHA="${VERSION}-${GITHUB_SHA::7}"
-          aws ecr get-login-password --region "$AWS_REGION" \
-            | skopeo login "$ECR_REGISTRY" --username AWS --password-stdin
+          skopeo login "$GAR_REGISTRY" --username oauth2accesstoken \
+            --password "${{ steps.auth.outputs.access_token }}"
           skopeo copy docker-archive:./result "docker://${IMAGE}:${VERSION}"
           skopeo copy docker-archive:./result "docker://${IMAGE}:${TAG_SHA}"
           skopeo copy docker-archive:./result "docker://${IMAGE}:latest"
