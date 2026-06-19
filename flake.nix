@@ -52,11 +52,38 @@
             Env = [ "PORT=8080" "RUST_LOG=info" ];
           };
         };
+
+        docs-static-root =
+          if builtins.pathExists ./docs-site/dist then
+            pkgs.runCommand "oxidizedgraph-docs-static" { } ''
+              mkdir -p $out/usr/share/nginx/html $out/etc/nginx/conf.d
+              cp -r ${./docs-site/dist}/* $out/usr/share/nginx/html/
+              cp ${./docs-site/nginx.conf} $out/etc/nginx/conf.d/default.conf
+            ''
+          else null;
+
+        docs-image =
+          if docs-static-root == null then
+            pkgs.runCommand "oxidizedgraph-docs-image-missing-dist" { } ''
+              echo "Run: cd docs-site && bun install && VITE_DOCS_BASE=/ bun run build" >&2
+              exit 1
+            ''
+          else
+            pkgs.dockerTools.buildLayeredImage {
+              name = "oxidizedgraph-docs";
+              tag = "latest";
+              contents = [ pkgs.nginx pkgs.cacert docs-static-root ];
+              config = {
+                Cmd = [ "${pkgs.nginx}/bin/nginx" "-g" "daemon off;" ];
+                ExposedPorts = { "8080/tcp" = {}; };
+                Env = [ "PORT=8080" ];
+              };
+            };
       in
       {
         packages = {
           default = oxidizedgraph-server;
-          inherit oxidizedgraph-server server-image;
+          inherit oxidizedgraph-server server-image docs-image;
         };
 
         checks = {

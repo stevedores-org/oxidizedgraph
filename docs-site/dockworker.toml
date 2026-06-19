@@ -4,8 +4,8 @@
 [package]
 name = "oxidizedgraph-docs"
 version = "0.1.0"
-description = "Documentation site for oxidizedgraph"
-authors = ["stevedores-org"]
+description = "SSO-gated commercial documentation for oxidizedgraph (Lornu AI enterprise edition)"
+authors = ["Lornuai, Inc."]
 runtime = "bun"
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -17,18 +17,19 @@ builder = "nix"
 base = "cgr.dev/chainguard/nginx:1.27"
 
 [oci.image]
-url = "https://github.com/stevedores-org/oxidizedgraph"
-source = "https://github.com/stevedores-org/oxidizedgraph"
-vendor = "stevedores"
-licenses = "MIT"
+url = "https://github.com/lornu-ai/oxidizedgraph"
+source = "https://github.com/lornu-ai/oxidizedgraph"
+vendor = "Lornuai, Inc."
+licenses = "LicenseRef-Lornu-Commercial"
 title = "oxidizedgraph-docs"
 
 [oci.image.labels]
-"stevedores.org/component" = "oxidizedgraph-docs"
-"stevedores.org/managed-by" = "dockworker"
-"stevedores.org/runtime" = "bun"
-"org.opencontainers.image.source" = "https://github.com/stevedores-org/oxidizedgraph"
-"org.opencontainers.image.description" = "Documentation site for oxidizedgraph"
+"lornu.ai/component" = "oxidizedgraph-docs"
+"lornu.ai/edition" = "commercial"
+"lornu.ai/managed-by" = "dockworker"
+"lornu.ai/runtime" = "bun"
+"org.opencontainers.image.source" = "https://github.com/lornu-ai/oxidizedgraph"
+"org.opencontainers.image.description" = "SSO-gated commercial docs for oxidizedgraph"
 
 [oci.config]
 user = "nonroot:nonroot"
@@ -47,7 +48,7 @@ PORT = "8080"
 [build]
 runtime = "bun"
 install = "bun install --frozen-lockfile"
-build = "bun run build"
+build = "VITE_DOCS_BASE=/ bun run build"
 typecheck = "bunx tsc --noEmit"
 
 [build.output]
@@ -79,7 +80,7 @@ invalidate_on = ["package.json", "bun.lock"]
 # Health Check
 # ═══════════════════════════════════════════════════════════════════════════════
 [oci.healthcheck]
-test = ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/oxidizedgraph/"]
+test = ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/"]
 interval = "30s"
 timeout = "5s"
 start_period = "10s"

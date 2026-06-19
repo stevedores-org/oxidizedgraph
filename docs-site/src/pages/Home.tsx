@@ -6,14 +6,14 @@ export default function Home() {
   return (
     <Layout>
       <div className="pb-10 mb-10 border-b border-zinc-800/60">
+        <p className="text-[11px] uppercase tracking-widest text-amber-500/90 font-semibold mb-2">Commercial Enterprise Edition</p>
         <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight bg-gradient-to-br from-zinc-100 to-zinc-400 bg-clip-text text-transparent leading-tight">oxidizedgraph</h1>
         <p className="text-lg text-zinc-400 mt-3 leading-relaxed max-w-xl">
-          High-performance agent orchestration framework in Rust. A humble attempt at LangGraph — with true multi-core parallelism, compile-time type safety, and ~5MB memory per session.
+          LangGraph-style agent orchestration in Rust — with enterprise tenancy, RBAC, audit trails, and SLO guardrails for production deployments.
         </p>
-        <div className="flex gap-3 mt-6">
+        <div className="flex flex-wrap gap-3 mt-6">
           <Link to="/getting-started" className="bg-violet-500 hover:bg-violet-600 text-white font-semibold px-5 py-2.5 rounded-lg transition text-sm">Get Started</Link>
-          <a href="https://github.com/stevedores-org/oxidizedgraph" className="border border-zinc-700 hover:border-zinc-500 px-5 py-2.5 rounded-lg transition text-sm text-zinc-300">GitHub</a>
-          <a href="https://crates.io/crates/oxidizedgraph" className="border border-zinc-700 hover:border-zinc-500 px-5 py-2.5 rounded-lg transition text-sm text-zinc-300">crates.io</a>
+          <Link to="/enterprise" className="border border-amber-700/50 hover:border-amber-500/70 px-5 py-2.5 rounded-lg transition text-sm text-amber-200/90">Enterprise</Link>
         </div>
       </div>
 

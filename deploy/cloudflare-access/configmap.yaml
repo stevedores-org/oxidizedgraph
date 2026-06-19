@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cloudflare-access-oxidizedgraph-docs
+  namespace: crossplane-system
+  labels:
+    lornu.ai/app: oxidizedgraph
+    lornu.ai/domain: lornu.ai
+    lornu.ai/component: docs-sso
+    lornu.ai/edition: commercial
+    lornu.ai/managed-by: flux
+data:
+  # Desired state for scripts/provision-cloudflare-docs-access.sh
+  #
+  # Interactive SSO ONLY — paid commercial docs. No anonymous or service-token
+  # bypass for document paths. Health probes hit the cluster Service directly.
+  #
+  # Wire into infra-code Flux (example KS name: cloudflare-access-oxidizedgraph-docs).
+  zone_id: "${CLOUDFLARE_ZONE_ID_LORNU_AI}"
+  account_id: "${CLOUDFLARE_ACCOUNT_ID}"
+  domain: lornu.ai
+
+  access_app_name: oxidizedgraph-docs
+  access_app_hostname: docs.oxidizedgraph.lornu.ai
+  access_app_type: self_hosted
+  session_duration: 8h
+
+  # Comma-separated IdP slugs enabled on this app (must exist in Zero Trust).
+  # Typical Lornu stack: Google Workspace + optional GitHub org SSO.
+  allowed_idps: "google,github"
+
+  # Lornu staff always allowed (break-glass for support).
+  staff_email_domain: lornu.ai
+
+  # Cloudflare Access group UUID for paying customers (create in Zero Trust → Groups).
+  # Leave empty until sales provisions the group; script skips when unset.
+  customer_access_group_id: ""
+
+  # Optional named customer emails (comma-separated) until group exists.
+  customer_emails: ""
+
+  # No public bypass — SSO required for all browser paths on this hostname.
+  bypass_paths: ""
+
+  # Audit / support contacts
+  owner_team: lornu-ai-engineering
+  licensing_contact: licensing@lornu.ai

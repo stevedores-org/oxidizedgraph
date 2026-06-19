@@ -5,6 +5,6 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  base: "/oxidizedgraph/",
+  base: process.env.VITE_DOCS_BASE || "/",
   resolve: { alias: { "@": path.resolve(__dirname, "./src") } },
 });

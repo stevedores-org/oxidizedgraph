@@ -15,6 +15,7 @@ derived from the open-source project:
 |---------|------------|------------|--------------------|
 | Community (OSS) | `stevedores-org/oxidizedgraph` | Public | Roadmap / partial |
 | Commercial | `lornu-ai/oxidizedgraph` | Private | `src/enterprise/*` — RBAC, tenancy, audit, SLO |
+| Commercial docs | https://docs.oxidizedgraph.lornu.ai | SSO (Cloudflare Access) | Paid + staff documentation site |
 
 ## Sync policy
 

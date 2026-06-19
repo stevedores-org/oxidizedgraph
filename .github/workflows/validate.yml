@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "deploy/**"
+      - "docs-site/**"
       - "flake.nix"
       - "flake.lock"
       - "Cargo.toml"
@@ -72,6 +73,12 @@ jobs:
 
       - name: kustomize build (gke-hub overlay)
         run: kustomize build deploy/overlays/gke-hub > /tmp/gke-hub.yaml
+
+      - name: kustomize build (commercial docs)
+        run: kustomize build deploy/docs/overlays/gke-prod > /tmp/docs.yaml
+
+      - name: kubeconform — commercial docs
+        run: kubeconform -strict -summary -kubernetes-version 1.29.0 /tmp/docs.yaml
 
       - name: Assert EKS overlay uses ECR image and amd64 scheduling
         run: |

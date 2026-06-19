@@ -6,6 +6,7 @@ import State from "./pages/State";
 import Nodes from "./pages/Nodes";
 import Edges from "./pages/Edges";
 import Runner from "./pages/Runner";
+import Enterprise from "./pages/Enterprise";
 
 export default function App() {
   return (
@@ -17,6 +18,7 @@ export default function App() {
       <Route path="/api/nodes" element={<Nodes />} />
       <Route path="/api/edges" element={<Edges />} />
       <Route path="/api/runner" element={<Runner />} />
+      <Route path="/enterprise" element={<Enterprise />} />
     </Routes>
   );
 }

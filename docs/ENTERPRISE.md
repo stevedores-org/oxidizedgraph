@@ -21,6 +21,15 @@ cargo run --example enterprise_workflow
 
 See [docs/ROADMAP-18.md](ROADMAP-18.md) for the full enterprise readiness epic.
 
+## Documentation (SSO)
+
+| Edition | URL | Access |
+|---------|-----|--------|
+| **Commercial** | https://docs.oxidizedgraph.lornu.ai | Cloudflare Access — paid customers + `@lornu.ai` staff |
+| **Community OSS** | https://docs.stevedores.org/oxidizedgraph/ | Public |
+
+Deploy and SSO runbook: [RUNBOOK_COMMERCIAL_DOCS_SSO.md](RUNBOOK_COMMERCIAL_DOCS_SSO.md)
+
 ## Licensing
 
 This repository is **proprietary** — see [LICENSE](../LICENSE). The community

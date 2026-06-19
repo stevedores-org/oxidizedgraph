@@ -7,6 +7,8 @@ tenancy, RBAC, audit, and SLO guardrails.
 > Apache-2.0 community edition is
 > [stevedores-org/oxidizedgraph](https://github.com/stevedores-org/oxidizedgraph).
 > See [UPSTREAM.md](UPSTREAM.md) and [docs/ENTERPRISE.md](docs/ENTERPRISE.md).
+>
+> **Documentation (SSO):** https://docs.oxidizedgraph.lornu.ai — [runbook](docs/RUNBOOK_COMMERCIAL_DOCS_SSO.md)
 
 **Topics:** `rust` · `langgraph` · `ai-agents` · `agent-orchestration` ·
 `multi-tenant` · `rbac` · `enterprise` · `audit` · `workflow-engine` · `lornu-ai`
