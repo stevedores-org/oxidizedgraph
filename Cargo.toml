@@ -3,11 +3,24 @@ name = "oxidizedgraph"
 version = "0.2.0"
 edition = "2021"
 authors = ["Lornuai, Inc."]
-description = "Commercial enterprise LangGraph-in-Rust orchestration — Lornu AI edition"
+description = "Private commercial LangGraph-in-Rust orchestration — multi-tenant RBAC, audit, SLO guardrails (Lornu AI enterprise edition)"
 license-file = "LICENSE"
 repository = "https://github.com/lornu-ai/oxidizedgraph"
 publish = false
-keywords = ["langgraph", "ai", "agents", "workflow", "graph", "enterprise"]
+keywords = [
+  "langgraph",
+  "ai-agents",
+  "agent-orchestration",
+  "rust",
+  "tokio",
+  "workflow",
+  "graph",
+  "enterprise",
+  "multi-tenant",
+  "rbac",
+  "audit",
+  "petgraph",
+]
 categories = ["asynchronous", "development-tools"]
 
 [features]

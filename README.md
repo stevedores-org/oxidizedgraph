@@ -8,6 +8,9 @@ tenancy, RBAC, audit, and SLO guardrails.
 > [stevedores-org/oxidizedgraph](https://github.com/stevedores-org/oxidizedgraph).
 > See [UPSTREAM.md](UPSTREAM.md) and [docs/ENTERPRISE.md](docs/ENTERPRISE.md).
 
+**Topics:** `rust` · `langgraph` · `ai-agents` · `agent-orchestration` ·
+`multi-tenant` · `rbac` · `enterprise` · `audit` · `workflow-engine` · `lornu-ai`
+
 ## Why oxidizedgraph?
 
 | Feature | LangGraph (Python) | oxidizedgraph |
