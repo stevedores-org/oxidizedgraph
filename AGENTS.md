@@ -11,6 +11,11 @@
 > `ai-agent-agent-guides sync`. Until then, treat any `ai-agents/…` path
 > mention below as **`bullpen/ai-agents/…`** in `lornu-ai/bullpen`.
 
+> **REPOSITORY — Commercial Enterprise Edition:** canonical home is
+> [`lornu-ai/oxidizedgraph`](https://github.com/lornu-ai/oxidizedgraph) (private).
+> OSS community edition: [`stevedores-org/oxidizedgraph`](https://github.com/stevedores-org/oxidizedgraph).
+> See [UPSTREAM.md](UPSTREAM.md).
+
 <@all>
 ## GROWTH WITHOUT LIMITS — SOVEREIGN ADX INSTRUCTIONS
 
