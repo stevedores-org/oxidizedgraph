@@ -130,8 +130,8 @@ jobs:
           nix_path: nixpkgs=channel:nixos-unstable
           extra_nix_config: |
             accept-flake-config = true
-            extra-substituters = https://nix-cache.stevedores.org
-            extra-trusted-public-keys = nix-cache.stevedores.org-1:Y2WLZtQTgxQ2QQzUnRDkDDKX08dL3NoNZ+Ohw3jv+7I=
+            extra-substituters = https://nix-cache.lornu.ai
+            extra-trusted-public-keys = nix-cache.lornu.ai-1:Y2WLZtQTgxQ2QQzUnRDkDDKX08dL3NoNZ+Ohw3jv+7I=
       - name: build server-image
         run: nix build .#server-image -L --no-link
 
@@ -184,8 +184,8 @@ jobs:
           nix_path: nixpkgs=channel:nixos-unstable
           extra_nix_config: |
             accept-flake-config = true
-            extra-substituters = https://nix-cache.stevedores.org
-            extra-trusted-public-keys = nix-cache.stevedores.org-1:Y2WLZtQTgxQ2QQzUnRDkDDKX08dL3NoNZ+Ohw3jv+7I=
+            extra-substituters = https://nix-cache.lornu.ai
+            extra-trusted-public-keys = nix-cache.lornu.ai-1:Y2WLZtQTgxQ2QQzUnRDkDDKX08dL3NoNZ+Ohw3jv+7I=
 
       - name: Install skopeo
         run: sudo apt-get update -qq && sudo apt-get install -y -qq skopeo

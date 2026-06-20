@@ -19,19 +19,19 @@ IMAGE_TAG="$(git rev-parse --short HEAD)" just push
 
 `flake.nix` does **not** set `nixConfig.extra-substituters` (it only applies for trusted users or with `--accept-flake-config`, and otherwise warns on every `nix` invocation).
 
-To use `https://nix-cache.stevedores.org` locally, pick one:
+To use `https://nix-cache.lornu.ai` locally, pick one:
 
 ```bash
 # One-shot
 nix build .#server-image --accept-flake-config \
-  --extra-substituters https://nix-cache.stevedores.org \
-  --extra-trusted-public-keys 'nix-cache.stevedores.org-1:Y2WLZtQTgxQ2QQzUnRDkDDKX08dL3NoNZ+Ohw3jv+7I='
+  --extra-substituters https://nix-cache.lornu.ai \
+  --extra-trusted-public-keys 'nix-cache.lornu.ai-1:Y2WLZtQTgxQ2QQzUnRDkDDKX08dL3NoNZ+Ohw3jv+7I='
 
 # Persistent (user nix.conf)
 mkdir -p ~/.config/nix
 cat >> ~/.config/nix/nix.conf <<'EOF'
-extra-substituters = https://nix-cache.stevedores.org
-extra-trusted-public-keys = nix-cache.stevedores.org-1:Y2WLZtQTgxQ2QQzUnRDkDDKX08dL3NoNZ+Ohw3jv+7I=
+extra-substituters = https://nix-cache.lornu.ai
+extra-trusted-public-keys = nix-cache.lornu.ai-1:Y2WLZtQTgxQ2QQzUnRDkDDKX08dL3NoNZ+Ohw3jv+7I=
 EOF
 ```
 
