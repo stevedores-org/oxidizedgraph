@@ -1,0 +1,33 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: oxidizedgraph-docs
+  namespace: oxidizedgraph-docs
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    external-dns.alpha.kubernetes.io/hostname: docs.oxidizedgraph.lornu.ai
+    # Origin is NOT public — Cloudflare Access (SSO) sits in front of this hostname.
+    # See deploy/cloudflare-access/ and docs/RUNBOOK_COMMERCIAL_DOCS_SSO.md.
+  labels:
+    lornu.ai/app: oxidizedgraph
+    lornu.ai/component: docs
+    lornu.ai/edition: commercial
+    lornu.ai/managed-by: flux
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - docs.oxidizedgraph.lornu.ai
+      secretName: oxidizedgraph-docs-tls
+  rules:
+    - host: docs.oxidizedgraph.lornu.ai
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: oxidizedgraph-docs
+                port:
+                  number: 80

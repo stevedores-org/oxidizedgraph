@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: oxidizedgraph-docs
+  namespace: oxidizedgraph-docs
+  labels:
+    app: oxidizedgraph-docs
+    lornu.ai/app: oxidizedgraph
+    lornu.ai/component: docs
+    lornu.ai/managed-by: flux
+spec:
+  type: ClusterIP
+  selector:
+    app: oxidizedgraph-docs
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP

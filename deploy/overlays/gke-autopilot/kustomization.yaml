@@ -11,7 +11,8 @@ resources:
 
 # Pin by semver in-repo; override with digest at deploy time (see docs/DEPLOY_GKE.md).
 images:
-  - name: ghcr.io/stevedores-org/oxidizedgraph/server
+  - name: SET_BY_OVERLAY/oxidizedgraph-server
+    newName: us-central1-docker.pkg.dev/gcp-lornu-ai/lornu-ai/oxidizedgraph-server
     newTag: "0.2.0"
 
 patches:

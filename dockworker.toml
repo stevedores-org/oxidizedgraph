@@ -10,13 +10,13 @@ flake = ".#"
 default = "0.2.0" # sync with Cargo.toml on release
 
 [[images]]
-name = "oxidizedgraph/server"
+name = "oxidizedgraph-server"
 nix_output = "server-image"
 push = true
 tag = "0.2.0"
 
 [registry]
-default = "ghcr.io/stevedores-org"
+default = "us-central1-docker.pkg.dev/gcp-lornu-ai/lornu-ai"
 
 [transport]
 tool = "skopeo"

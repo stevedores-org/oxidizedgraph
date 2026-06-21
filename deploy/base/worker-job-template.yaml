@@ -27,7 +27,7 @@ spec:
       serviceAccountName: oxidizedgraph-worker
       containers:
         - name: worker
-          image: ghcr.io/stevedores-org/oxidizedgraph/server:0.2.0
+          image: SET_BY_OVERLAY/oxidizedgraph-server:SET_BY_OVERLAY
           env:
             - name: A2A_TASK_ID
               value: TASK_ID_PLACEHOLDER

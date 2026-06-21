@@ -1,10 +1,17 @@
-# oxidizedgraph
+# oxidizedgraph — Lornu AI Commercial Enterprise Edition
 
-**A humble attempt at LangGraph in Rust** - High-performance agent orchestration framework.
+**LangGraph in Rust** — high-performance agent orchestration with enterprise
+tenancy, RBAC, audit, and SLO guardrails.
 
-[![Crates.io](https://img.shields.io/crates/v/oxidizedgraph.svg)](https://crates.io/crates/oxidizedgraph)
-[![Documentation](https://docs.rs/oxidizedgraph/badge.svg)](https://docs.rs/oxidizedgraph)
-[![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+> **Private / commercial.** This repository is `lornu-ai/oxidizedgraph`. The
+> Apache-2.0 community edition is
+> [stevedores-org/oxidizedgraph](https://github.com/stevedores-org/oxidizedgraph).
+> See [UPSTREAM.md](UPSTREAM.md) and [docs/ENTERPRISE.md](docs/ENTERPRISE.md).
+>
+> **Documentation (SSO):** https://docs.oxidizedgraph.lornu.ai — [runbook](docs/RUNBOOK_COMMERCIAL_DOCS_SSO.md)
+
+**Topics:** `rust` · `langgraph` · `ai-agents` · `agent-orchestration` ·
+`multi-tenant` · `rbac` · `enterprise` · `audit` · `workflow-engine` · `lornu-ai`
 
 ## Why oxidizedgraph?
 

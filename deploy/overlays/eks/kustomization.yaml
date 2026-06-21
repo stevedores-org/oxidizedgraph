@@ -6,6 +6,7 @@ resources:
   - ../gke-autopilot
 
 images:
-  - name: ghcr.io/stevedores-org/oxidizedgraph/server
+  # Inherits gke-autopilot (GAR); re-point to ECR for legacy EKS smoke/prod.
+  - name: us-central1-docker.pkg.dev/gcp-lornu-ai/lornu-ai/oxidizedgraph-server
     newName: 148080843892.dkr.ecr.us-east-2.amazonaws.com/stevedores-org/oxidizedgraph/server
     newTag: "0.2.0"

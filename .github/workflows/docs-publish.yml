@@ -1,0 +1,100 @@
+name: docs-publish
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  GAR_LOCATION: us-central1
+  GAR_REGISTRY: us-central1-docker.pkg.dev
+  GAR_REPOSITORY: gcp-lornu-ai/lornu-ai/oxidizedgraph-docs
+
+jobs:
+  validate:
+    name: build docs + kustomize
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: bun build (commercial root host)
+        working-directory: docs-site
+        run: |
+          bun install --frozen-lockfile
+          VITE_DOCS_BASE=/ bun run build
+
+      - name: Install kustomize
+        run: |
+          curl -sLo /tmp/kustomize.tgz \
+            https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.4.3/kustomize_v5.4.3_linux_amd64.tar.gz
+          tar -xzf /tmp/kustomize.tgz -C /usr/local/bin
+
+      - name: kustomize build docs overlay
+        run: kustomize build deploy/docs/overlays/gke-prod
+
+      - uses: cachix/install-nix-action@v27
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+          extra_nix_config: |
+            accept-flake-config = true
+
+      - name: nix build docs-image (requires dist/)
+        run: nix build .#docs-image -o result --no-link
+
+  publish-gar:
+    name: publish docs image to GAR
+    needs: validate
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.GCP_WIF_PROVIDER != '' && vars.GCP_WIF_SERVICE_ACCOUNT != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: bun build
+        working-directory: docs-site
+        run: |
+          bun install --frozen-lockfile
+          VITE_DOCS_BASE=/ bun run build
+
+      - uses: cachix/install-nix-action@v27
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+          extra_nix_config: |
+            accept-flake-config = true
+
+      - name: Authenticate to Google Cloud (OIDC)
+        id: auth
+        uses: google-github-actions/auth@6fc4af4b145ae7821d527454aa9bd537d1f2dc5f
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_WIF_SERVICE_ACCOUNT }}
+          token_format: access_token
+
+      - name: Install skopeo
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq skopeo
+
+      - name: Build and push docs OCI image
+        run: |
+          nix build .#docs-image -o result -L
+          mkdir -p ~/.config/containers
+          printf '%s\n' '{"default":[{"type":"insecureAcceptAnything"}]}' > ~/.config/containers/policy.json
+          VERSION=$(node -p "require('./docs-site/package.json').version")
+          IMAGE="${GAR_REGISTRY}/${GAR_REPOSITORY}"
+          TAG_SHA="${VERSION}-${GITHUB_SHA::7}"
+          skopeo login "$GAR_REGISTRY" --username oauth2accesstoken \
+            --password "${{ steps.auth.outputs.access_token }}"
+          skopeo copy docker-archive:./result "docker://${IMAGE}:${VERSION}"
+          skopeo copy docker-archive:./result "docker://${IMAGE}:${TAG_SHA}"
+          skopeo copy docker-archive:./result "docker://${IMAGE}:latest"
+          echo "Pushed ${IMAGE}:${VERSION}, ${IMAGE}:${TAG_SHA}, ${IMAGE}:latest"
