@@ -8,6 +8,7 @@ resources:
   - deployment.yaml
   - service.yaml
   - ingress.yaml
+  - docs-publish-agentrun.yaml
 
 commonLabels:
   lornu.ai/app: oxidizedgraph

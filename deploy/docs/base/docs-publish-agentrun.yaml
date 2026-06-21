@@ -1,0 +1,54 @@
+apiVersion: agent.lornu.ai/v1
+kind: AgentRun
+metadata:
+  name: docs-publish
+  namespace: oxidizedgraph-docs
+  labels:
+    app: docs-publish
+    lornu.ai/managed-by: flux
+spec:
+  agent_image: us-central1-docker.pkg.dev/gcp-lornu-ai/bullpen/ai-agent-docs:0.1.0
+  agent_type: docs-publish
+  timeout: 3600
+  retry_policy:
+    max_retries: 3
+    backoff_seconds: 60
+    backoff_multiplier: 2.0
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+    limits:
+      cpu: "2"
+      memory: "4Gi"
+  context_sources:
+    - source_type: aivcs
+      query: lornu-ai/oxidizedgraph@main
+      mount_path: /workspace/oxidizedgraph
+  instruction: |
+    Perform sovereign pipeline build and publish for oxidizedgraph-docs on merge to main.
+
+    1. Change Detection:
+       Verify if the commit triggers a rebuild by checking if any of the following paths/files have changed relative to the previous commit:
+       - `docs-site/**`
+       - `flake.nix`
+       - `docs-site/bun.lock`
+       - `package.json`
+       - `deploy/docs/**`
+       If none of the above paths are changed, log "No changes in docs-site, flake.nix, package.json, or deploy/docs, skipping build." and exit successfully.
+
+    2. Hermetic Build:
+       If changes are detected:
+       a. Change directory to `/workspace/oxidizedgraph/docs-site`.
+       b. Run `bun install --frozen-lockfile` to install dependencies.
+       c. Run `VITE_DOCS_BASE=/ bun run build` to build the static site.
+       d. Change directory back to `/workspace/oxidizedgraph` and run `nix build .#docs-image -o result` to build the docs OCI image hermetically.
+
+    3. Publish to Google Artifact Registry (GAR):
+       Authenticate to Google Artifact Registry using GKE cluster Workload Identity Federation (WIF).
+       Target registry: `us-central1-docker.pkg.dev`
+       Target repository: `us-central1-docker.pkg.dev/gcp-lornu-ai/lornu/oxidizedgraph-docs`
+       Use skopeo to push/copy the built docker archive `result` to the registry with the following tags:
+       - `latest`
+       - The package version from `docs-site/package.json`
+       - The tag format `${VERSION}-${COMMIT_SHA::7}`

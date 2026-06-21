@@ -1,21 +1,6 @@
 name: docs-publish
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "docs-site/**"
-      - "deploy/docs/**"
-      - "deploy/cloudflare-access/**"
-      - "scripts/provision-cloudflare-docs-access.sh"
-      - "flake.nix"
-      - ".github/workflows/docs-publish.yml"
-  pull_request:
-    paths:
-      - "docs-site/**"
-      - "deploy/docs/**"
-      - "deploy/cloudflare-access/**"
-      - ".github/workflows/docs-publish.yml"
   workflow_dispatch:
 
 permissions:

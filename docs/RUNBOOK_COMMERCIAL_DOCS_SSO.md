@@ -29,19 +29,28 @@ Browser → Cloudflare (DNS proxy) → Access SSO gate → GKE Ingress → oxidi
 - [ ] `lornu.ai` zone in Cloudflare (orange-cloud DNS)
 - [ ] Zero Trust IdPs: **Google** (Workspace) and/or **GitHub** org SSO configured
 - [ ] Account API token: `Access: Apps and Policies → Edit`
-- [ ] GAR image `gcp-lornu-ai/lornu-ai/oxidizedgraph-docs` (CI: `.github/workflows/docs-publish.yml`)
+- [ ] GAR image `us-central1-docker.pkg.dev/gcp-lornu-ai/lornu/oxidizedgraph-docs` (Built in-cluster via AIVCS `AgentRun` on `main` merge)
 - [ ] Flux path in `lornu-ai/infra-code` pointing at `deploy/docs/overlays/gke-prod` (follow-up PR)
 
 ## Step 1 — Build and publish docs image
 
-On merge to `main` (when WIF vars are set):
+On merge to `main`, the in-cluster AIVCS `AgentRun` (`deploy/docs/base/docs-publish-agentrun.yaml`) is reconciled by Flux and executed by the sovereign runner.
 
+The pipeline performs change detection on:
+- `docs-site/**`
+- `flake.nix`
+- `docs-site/bun.lock`
+- `package.json`
+- `deploy/docs/**`
+
+If changes are detected, it performs a hermetic build of `.#docs-image` using Nix, authenticates using cluster Workload Identity Federation (WIF), and publishes to:
 ```bash
-# CI publishes to:
-# us-central1-docker.pkg.dev/gcp-lornu-ai/lornu-ai/oxidizedgraph-docs:latest
+# Target repository:
+# us-central1-docker.pkg.dev/gcp-lornu-ai/lornu/oxidizedgraph-docs:latest
 ```
 
 Local smoke build:
+
 
 ```bash
 cd docs-site
