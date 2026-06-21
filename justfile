@@ -4,7 +4,7 @@ default:
     @just --list
 
 image-tag := env_var_or_default("IMAGE_TAG", "0.2.0")
-image := "ghcr.io/stevedores-org/oxidizedgraph/server:" + image-tag
+image := "us-central1-docker.pkg.dev/gcp-lornu-ai/lornu-ai/oxidizedgraph-server:" + image-tag
 
 build:
     cargo build --bin oxidizedgraph-server

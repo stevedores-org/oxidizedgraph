@@ -41,7 +41,7 @@ impl Default for WorkerSpawnerConfig {
         Self {
             mode: "memory".into(),
             namespace: "oxidizedgraph".into(),
-            worker_image: "ghcr.io/stevedores-org/oxidizedgraph/server:0.2.0".into(),
+            worker_image: "us-central1-docker.pkg.dev/gcp-lornu-ai/lornu-ai/oxidizedgraph-server:0.2.0".into(),
             service_account: "oxidizedgraph-worker".into(),
             ttl_seconds_after_finished: 3600,
             orchestrator_url: "http://oxidizedgraph:8080".into(),
