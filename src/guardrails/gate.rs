@@ -6,9 +6,14 @@ use std::time::Instant;
 
 use crate::error::NodeError;
 use crate::graph::{NodeExecutor, NodeOutput};
-use crate::guardrails::findings::{GateCheck, GateResult, ReviewFinding};
+use crate::guardrails::findings::{FindingSeverity, GateCheck, GateResult, ReviewFinding};
 use crate::guardrails::risk::{ChangeRisk, RiskClassifier};
 use crate::state::SharedState;
+
+/// Context key for externally-supplied review findings (e.g. from a reviewer
+/// agent). Any `Error`-severity finding here fails the gate even when every
+/// command check passes — restoring the pre-#65 `quality_report` contract.
+pub const REVIEW_FINDINGS_KEY: &str = "review_findings";
 
 /// Specification for a command to run as a quality gate.
 #[derive(Clone, Debug)]
@@ -225,20 +230,39 @@ impl NodeExecutor for QualityGateNode {
     }
 
     async fn execute(&self, state: SharedState) -> Result<NodeOutput, NodeError> {
-        let gate_result = self.run_checks().await;
+        let mut gate_result = self.run_checks().await;
 
         let change_risk = {
             let guard = state
                 .read()
                 .map_err(|e| NodeError::execution_failed(e.to_string()))?;
+
+            // Fold in externally-supplied review findings so an Error-severity
+            // finding (e.g. from a reviewer agent) blocks the merge even when
+            // the command checks all pass. The command-only gate introduced in
+            // #65 had silently dropped this `quality_report` contract.
+            if let Some(external) = guard.get_context::<Vec<ReviewFinding>>(REVIEW_FINDINGS_KEY) {
+                let has_error = external
+                    .iter()
+                    .any(|f| f.severity == FindingSeverity::Error);
+                gate_result.findings.extend(external);
+                if has_error {
+                    gate_result.passed = false;
+                    gate_result.merge_blocked = true;
+                }
+            }
+
             guard
                 .get_context::<ChangeRisk>("change_risk")
                 .unwrap_or_default()
         };
 
         let risk = self.risk_classifier.classify(&change_risk);
+        // Route on the ACTUAL gate result so a failing gate is never reported
+        // as "passed". `block_on_failure` controls only whether the failure is
+        // a hard merge block (via merge_blocker below), not the routing.
+        let route = RiskClassifier::approval_route(risk, gate_result.passed);
         let effective_pass = gate_result.passed || !self.config.block_on_failure;
-        let route = RiskClassifier::approval_route(risk, effective_pass);
         let merge_blocker = self.risk_classifier.merge_blocker(effective_pass, risk);
 
         {
@@ -365,7 +389,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_non_blocking_failure_still_marks_merge_blocker() {
+    async fn test_non_blocking_failure_routes_gate_failed_but_advisory() {
+        // A failing gate must NOT be reported as "passed" even when
+        // block_on_failure is false: routing reflects the real result
+        // ("gate_failed"), while block_on_failure only softens the merge
+        // blocker to advisory (not blocked).
         let config = QualityGateConfig {
             checks: vec![CommandSpec {
                 name: "mock_check".to_string(),
@@ -379,13 +407,48 @@ mod tests {
 
         let state = Arc::new(RwLock::new(AgentState::new()));
         let output = node.execute(state.clone()).await.unwrap();
-        assert_eq!(output.target(), Some("passed"));
+        assert_eq!(output.target(), Some("gate_failed"));
 
         let guard = state.read().unwrap();
         assert_eq!(guard.get_context::<bool>("gate_passed"), Some(false));
         let blocker = guard
             .get_context::<crate::guardrails::risk::MergeBlocker>("merge_blocker")
             .expect("merge_blocker");
-        assert!(!blocker.blocked);
+        assert!(!blocker.blocked, "non-blocking failure should be advisory");
+    }
+
+    #[tokio::test]
+    async fn test_external_error_finding_fails_passing_gate() {
+        // All command checks pass, but an externally-supplied Error finding
+        // (e.g. from a reviewer agent) must still block the merge.
+        let config = QualityGateConfig {
+            checks: vec![CommandSpec {
+                name: "mock_check".to_string(),
+                program: "true".to_string(),
+                args: vec![],
+            }],
+            block_on_failure: true,
+        };
+        let runner = Arc::new(MockCommandRunner::new().with_result("mock_check", 0, "ok"));
+        let node = QualityGateNode::with_runner("gate", config, runner);
+
+        let mut agent_state = AgentState::new();
+        agent_state.set_context(
+            REVIEW_FINDINGS_KEY,
+            vec![ReviewFinding::error(
+                "reviewer.security",
+                "hardcoded credential in src/main.rs",
+            )],
+        );
+        let state = Arc::new(RwLock::new(agent_state));
+        let output = node.execute(state.clone()).await.unwrap();
+        assert_eq!(output.target(), Some("gate_failed"));
+
+        let guard = state.read().unwrap();
+        assert_eq!(guard.get_context::<bool>("gate_passed"), Some(false));
+        let blocker = guard
+            .get_context::<crate::guardrails::risk::MergeBlocker>("merge_blocker")
+            .expect("merge_blocker");
+        assert!(blocker.blocked, "Error finding must block merge");
     }
 }

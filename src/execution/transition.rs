@@ -132,6 +132,11 @@ impl TransitionLog {
         self.records.push(record);
     }
 
+    /// Drop all recorded transitions (used to reset a reused runner per run).
+    pub fn clear(&mut self) {
+        self.records.clear();
+    }
+
     /// All recorded transitions.
     pub fn records(&self) -> &[TransitionRecord] {
         &self.records

@@ -120,8 +120,24 @@ impl SandboxExecutor for SubprocessSandbox {
                 .await
                 .map_err(|e| SandboxError::CommandFailed(e.to_string()))?;
             if !output.status.success() {
+                // Include stdout and the exit status, not just stderr: many
+                // tools print their diagnostics to stdout before exiting
+                // non-zero, so a stderr-only message is often empty/useless.
                 let stderr = String::from_utf8_lossy(&output.stderr);
-                return Err(SandboxError::CommandFailed(stderr.to_string()));
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                let status = output
+                    .status
+                    .code()
+                    .map(|c| format!("exit code {c}"))
+                    .unwrap_or_else(|| "terminated by signal".to_string());
+                let mut msg = format!("command failed ({status})");
+                if !stdout.trim().is_empty() {
+                    msg.push_str(&format!("\nstdout: {}", stdout.trim()));
+                }
+                if !stderr.trim().is_empty() {
+                    msg.push_str(&format!("\nstderr: {}", stderr.trim()));
+                }
+                return Err(SandboxError::CommandFailed(msg));
             }
             Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
         };
@@ -149,5 +165,19 @@ mod tests {
             SubprocessSandbox::new(SandboxConfig::with_timeout(Duration::from_millis(50)));
         let result = sandbox.run("sleep 2", None).await;
         assert!(matches!(result, Err(SandboxError::Timeout(_))));
+    }
+
+    #[tokio::test]
+    async fn test_failure_includes_stdout_and_exit_code() {
+        let sandbox = SubprocessSandbox::new(SandboxConfig::with_timeout(Duration::from_secs(5)));
+        // Tool prints its diagnostic to stdout (not stderr) then exits non-zero.
+        let result = sandbox.run("echo diagnostic-on-stdout; exit 3", None).await;
+        match result {
+            Err(SandboxError::CommandFailed(msg)) => {
+                assert!(msg.contains("diagnostic-on-stdout"), "stdout lost: {msg}");
+                assert!(msg.contains("exit code 3"), "exit code lost: {msg}");
+            }
+            other => panic!("expected CommandFailed, got {other:?}"),
+        }
     }
 }
