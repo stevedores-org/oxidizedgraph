@@ -5,7 +5,7 @@ This guide is a fast map for contributors who want to ship meaningful changes qu
 ## Local Setup
 
 ```bash
-git clone https://github.com/stevedores-org/oxidizedgraph.git
+git clone aivcs://stevedores-org/oxidizedgraph.git
 cd oxidizedgraph
 cargo test
 ```

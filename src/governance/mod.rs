@@ -8,8 +8,8 @@
 //! - Role routing primitives ([`RoleRouterNode`], [`RoleHandoffNode`])
 //! - Per-role tool restrictions via [`tool_policy_for_role`]
 //!
-//! [issue]: https://github.com/stevedores-org/oxidizedgraph/issues/31
-//! [roadmap]: https://github.com/stevedores-org/oxidizedgraph/issues/18
+//! [issue]: aivcs://stevedores-org/oxidizedgraph/issues/31
+//! [roadmap]: aivcs://stevedores-org/oxidizedgraph/issues/18
 //!
 //! # Quick start
 //!

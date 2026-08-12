@@ -1,6 +1,6 @@
 # Roadmap: Autonomous AI Agent Orchestration (#18)
 
-This document tracks implementation of [Issue #18](https://github.com/stevedores-org/oxidizedgraph/issues/18) in oxidizedgraph.
+This document tracks implementation of [Issue #18](aivcs://stevedores-org/oxidizedgraph/issues/18) in oxidizedgraph.
 
 ## Desired Outcome
 
@@ -194,12 +194,12 @@ All roadmap epics for #18 are implemented on `develop`.
 
 ## Related Issues
 
-- [#18](https://github.com/stevedores-org/oxidizedgraph/issues/18) — Roadmap parent
-- [#22](https://github.com/stevedores-org/oxidizedgraph/issues/22) — EPIC4 Code Quality Guardrails
-- [#24](https://github.com/stevedores-org/oxidizedgraph/issues/24) — EPIC6 Planning and Long-Horizon Autonomy
-- [#23](https://github.com/stevedores-org/oxidizedgraph/issues/23) — EPIC5 Memory, Context, and Retrieval
-- [#27](https://github.com/stevedores-org/oxidizedgraph/issues/27) — EPIC9 Multi-Repo and CI/CD Orchestration
-- [#28](https://github.com/stevedores-org/oxidizedgraph/issues/28) — EPIC10 Enterprise Readiness
-- [#26](https://github.com/stevedores-org/oxidizedgraph/issues/26) — EPIC8 Human-in-the-Loop Controls
-- [#35](https://github.com/stevedores-org/oxidizedgraph/issues/35) — GovernanceNode
-- [#36](https://github.com/stevedores-org/oxidizedgraph/issues/36) — Agent Role-Based Routing
+- [#18](aivcs://stevedores-org/oxidizedgraph/issues/18) — Roadmap parent
+- [#22](aivcs://stevedores-org/oxidizedgraph/issues/22) — EPIC4 Code Quality Guardrails
+- [#24](aivcs://stevedores-org/oxidizedgraph/issues/24) — EPIC6 Planning and Long-Horizon Autonomy
+- [#23](aivcs://stevedores-org/oxidizedgraph/issues/23) — EPIC5 Memory, Context, and Retrieval
+- [#27](aivcs://stevedores-org/oxidizedgraph/issues/27) — EPIC9 Multi-Repo and CI/CD Orchestration
+- [#28](aivcs://stevedores-org/oxidizedgraph/issues/28) — EPIC10 Enterprise Readiness
+- [#26](aivcs://stevedores-org/oxidizedgraph/issues/26) — EPIC8 Human-in-the-Loop Controls
+- [#35](aivcs://stevedores-org/oxidizedgraph/issues/35) — GovernanceNode
+- [#36](aivcs://stevedores-org/oxidizedgraph/issues/36) — Agent Role-Based Routing

@@ -5,8 +5,8 @@
 | **Status** | Draft — for research group review |
 | **Authors** | Stevedores engineering (synthesized from platform review, June 2026) |
 | **Audience** | Research group, platform engineers, agent operators |
-| **Repositories** | [oxidizedgraph](https://github.com/stevedores-org/oxidizedgraph), [oxidizedRAG](https://github.com/stevedores-org/oxidizedRAG), [lornu-ai/bullpen](https://github.com/lornu-ai/bullpen) (agent roster) |
-| **Related** | [TDD: AI inference KV & RAG vectors](https://github.com/stevedores-org/oxidizedRAG/blob/develop/docs/TDD-ai-inference-storage-and-rag-vectors.md), oxidizedgraph [#18](https://github.com/stevedores-org/oxidizedgraph/issues/18), `lornu-mcp-settings` |
+| **Repositories** | [oxidizedgraph](aivcs://stevedores-org/oxidizedgraph), [oxidizedRAG](aivcs://stevedores-org/oxidizedRAG), [lornu-ai/bullpen](aivcs://lornu-ai/bullpen) (agent roster) |
+| **Related** | [TDD: AI inference KV & RAG vectors](aivcs://stevedores-org/oxidizedRAG/blob/develop/docs/TDD-ai-inference-storage-and-rag-vectors.md), oxidizedgraph [#18](aivcs://stevedores-org/oxidizedgraph/issues/18), `lornu-mcp-settings` |
 
 ---
 
@@ -314,7 +314,7 @@ Store `cli_lane` and `workspace_slot` on `AgentState.context` for AIVCS traceabi
 1. **Cursor vs Claude Code CLI:** When should operators prefer IDE agent over headless Claude?
 2. **Gemini for Rust:** Is Gemini CLI acceptable for `graphrag-core` if `GEMINI.md` mandates tests, or doc-only?
 3. **Slot count:** Optimal N/M/K for claude-code / gemini / codex pools on a 64GB machine?
-4. **Central handoff store:** `HANDOFF.md` vs Valkey session blob (see [RAG/KV TDD](https://github.com/stevedores-org/oxidizedRAG/blob/develop/docs/TDD-ai-inference-storage-and-rag-vectors.md))?
+4. **Central handoff store:** `HANDOFF.md` vs Valkey session blob (see [RAG/KV TDD](aivcs://stevedores-org/oxidizedRAG/blob/develop/docs/TDD-ai-inference-storage-and-rag-vectors.md))?
 5. **Cost caps:** Per-lane token budgets and escalation to human?
 
 Comment on the tracking issue (§12).
@@ -334,11 +334,11 @@ Comment on the tracking issue (§12).
 ## 13. References
 
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) — Anthropic CLI
-- [Gemini CLI](https://github.com/google-gemini/gemini-cli) — Google
+- [Gemini CLI](aivcs://google-gemini/gemini-cli) — Google
 - [OpenAI Codex CLI](https://developers.openai.com/codex) — OpenAI
-- [lornu-ai-mcp-settings](https://github.com/lornu-ai/lornu-ai-mcp-settings) — MCP sync across tools
-- [oxidizedgraph Issue #18](https://github.com/stevedores-org/oxidizedgraph/issues/18) — agent orchestration roadmap
-- [oxidizedRAG TDD — KV & vectors](https://github.com/stevedores-org/oxidizedRAG/blob/develop/docs/TDD-ai-inference-storage-and-rag-vectors.md)
+- [lornu-ai-mcp-settings](aivcs://lornu-ai/lornu-ai-mcp-settings) — MCP sync across tools
+- [oxidizedgraph Issue #18](aivcs://stevedores-org/oxidizedgraph/issues/18) — agent orchestration roadmap
+- [oxidizedRAG TDD — KV & vectors](aivcs://stevedores-org/oxidizedRAG/blob/develop/docs/TDD-ai-inference-storage-and-rag-vectors.md)
 
 ---
 

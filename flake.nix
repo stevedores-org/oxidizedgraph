@@ -5,10 +5,10 @@
   # applied unless the user is a trusted-user or passes --accept-flake-config.
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    rust-overlay.url = "github:oxalica/rust-overlay";
-    flake-utils.url = "github:numtide/flake-utils";
-    crane.url = "github:ipetkov/crane";
+    nixpkgs.url = "tarball+https://registry.aivcs.io/github/NixOS/nixpkgs/nixos-unstable";
+    rust-overlay.url = "tarball+https://registry.aivcs.io/github/oxalica/rust-overlay";
+    flake-utils.url = "tarball+https://registry.aivcs.io/github/numtide/flake-utils";
+    crane.url = "tarball+https://registry.aivcs.io/github/ipetkov/crane";
   };
 
   outputs = { self, nixpkgs, rust-overlay, flake-utils, crane, ... }:

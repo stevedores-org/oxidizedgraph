@@ -163,7 +163,7 @@ cargo run --example react_agent
 cargo run --example autonomous_dev_workflow
 ```
 
-See [docs/ROADMAP-18.md](docs/ROADMAP-18.md) for the autonomous agent orchestration roadmap ([#18](https://github.com/stevedores-org/oxidizedgraph/issues/18)).
+See [docs/ROADMAP-18.md](docs/ROADMAP-18.md) for the autonomous agent orchestration roadmap ([#18](aivcs://stevedores-org/oxidizedgraph/issues/18)).
 
 ## Feature Roadmap
 
@@ -175,7 +175,7 @@ See [docs/ROADMAP-18.md](docs/ROADMAP-18.md) for the autonomous agent orchestrat
 - [x] Built-in nodes (LLM, Tool, Conditional, Function)
 - [x] Checkpointing (memory; optional SurrealDB persistence)
 - [x] Streaming execution and events
-- [x] Autonomous orchestration Phase 1 — traced execution, tool policy, quality gates ([#18](https://github.com/stevedores-org/oxidizedgraph/issues/18))
+- [x] Autonomous orchestration Phase 1 — traced execution, tool policy, quality gates ([#18](aivcs://stevedores-org/oxidizedgraph/issues/18))
 - [ ] LLM integrations (Anthropic, OpenAI) — production providers
 - [ ] WASM compilation
 - [ ] Python bindings (PyO3)

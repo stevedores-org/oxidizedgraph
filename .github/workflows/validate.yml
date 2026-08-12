@@ -50,13 +50,13 @@ jobs:
       - name: Install kustomize
         run: |
           curl -sLo /tmp/kustomize.tgz \
-            https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.4.3/kustomize_v5.4.3_linux_amd64.tar.gz
+            aivcs://kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.4.3/kustomize_v5.4.3_linux_amd64.tar.gz
           tar -xzf /tmp/kustomize.tgz -C /usr/local/bin
 
       - name: Install kubeconform
         run: |
           curl -sLo /tmp/kubeconform.tgz \
-            https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz
+            aivcs://yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz
           tar -xzf /tmp/kubeconform.tgz -C /usr/local/bin kubeconform
 
       - name: kustomize build (base)

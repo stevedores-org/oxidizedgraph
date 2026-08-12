@@ -118,7 +118,7 @@ When tasked with project maintenance or objective progression, follow this Algor
 
 ### Flux GitOps Authentication
 This repository is **PRIVATE** and uses **OAuth token authentication** for Flux CD:
-- **GitHub App**: Flux OAuth App (ID: 3313758) - https://github.com/apps/flux-oauth-app
+- **GitHub App**: Flux OAuth App (ID: 3313758) - aivcs://apps/flux-oauth-app
 - **Deploy Keys**: Disabled by lornu-ai organization policy.
 - **OIDC Provider**: AWS IAM OIDC Provider configured for GitHub Actions
 - **Bootstrap**: Always use `--token-auth` flag when bootstrapping Flux.
@@ -160,7 +160,7 @@ kubernetes/overlays/        # Environment overlays: dev, staging, prod
 ## Satellite Repositories (Automation Services)
 
 **Cloudflare Workers** are managed in separate repositories:
-- **automation-hub**: [lornu-ai/automation-hub](https://github.com/lornu-ai/automation-hub)
+- **automation-hub**: [lornu-ai/automation-hub](aivcs://lornu-ai/automation-hub)
   - Workers: `automation-hub` (CI automation), `lornu-edge-discovery` (Hyperdrive-based agent discovery)
   - **Private RAG (Issue #565)**: R2 bucket + Vectorize for agent knowledge grounding
     - Endpoints: `/api/rag/search`, `/api/vectorize/trigger`, `/api/vectorize/status`
@@ -170,7 +170,7 @@ kubernetes/overlays/        # Environment overlays: dev, staging, prod
   - Related: Issue #589 (Edge Discovery), Issue #542 (CI Automation), Issue #565 (Private RAG)
 
 **GitLab CI/CD** configurations are managed separately:
-- **gitlab-container-builds**: [lornu-ai/gitlab-container-builds](https://github.com/lornu-ai/gitlab-container-builds)
+- **gitlab-container-builds**: [lornu-ai/gitlab-container-builds](aivcs://lornu-ai/gitlab-container-builds)
   - Purpose: GitLab CI/CD pipelines for container builds and multi-cloud mirroring
   - Related: GitLab pull mirroring (see `docs/GITLAB_MIRROR_SETUP.md`)
 
@@ -329,7 +329,7 @@ This flow is enforced by CI - PRs that don't follow this pattern will be blocked
 
 ## Flux GitHub Authentication
 - **Method**: GitHub App (OAuth) - not deploy keys or SSH
-- **GitHub App**: `https://github.com/organizations/lornu-ai/settings/applications/3313758`
+- **GitHub App**: `aivcs://organizations/lornu-ai/settings/applications/3313758`
 - **Secret**: `flux-github-auth` in `flux-system` namespace
 - **Policy**: Deploy keys disabled by organization policy
 

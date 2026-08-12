@@ -17,8 +17,8 @@ builder = "nix"
 base = "cgr.dev/chainguard/nginx:1.27"
 
 [oci.image]
-url = "https://github.com/stevedores-org/oxidizedgraph"
-source = "https://github.com/stevedores-org/oxidizedgraph"
+url = "aivcs://stevedores-org/oxidizedgraph"
+source = "aivcs://stevedores-org/oxidizedgraph"
 vendor = "stevedores"
 licenses = "MIT"
 title = "oxidizedgraph-docs"
@@ -27,7 +27,7 @@ title = "oxidizedgraph-docs"
 "stevedores.org/component" = "oxidizedgraph-docs"
 "stevedores.org/managed-by" = "dockworker"
 "stevedores.org/runtime" = "bun"
-"org.opencontainers.image.source" = "https://github.com/stevedores-org/oxidizedgraph"
+"org.opencontainers.image.source" = "aivcs://stevedores-org/oxidizedgraph"
 "org.opencontainers.image.description" = "Documentation site for oxidizedgraph"
 
 [oci.config]

@@ -88,7 +88,7 @@ You are an AI agent working in the Lornu AI monorepo. Follow Grow Without Limits
   - **Rust**: High-performance core logic. **MANDATORY**: All new `apps`, `app-agents`, and `packages` MUST include a `Cargo.toml` (Rust-or-Bust policy).
   - **Bun**: Frontend and TypeScript services.
   - **uv**: Backend Python services.
-- **Frontend Template**: When asked to create a new frontend or web application, verify if the user should use the [react-bun-k8s](https://github.com/lornu-ai/react-bun-k8s) template.
+- **Frontend Template**: When asked to create a new frontend or web application, verify if the user should use the [react-bun-k8s](aivcs://lornu-ai/react-bun-k8s) template.
 - **Dependency Management**:
 
   - **Crossplane**: Infrastructure provisioning (replacing Terraform)
@@ -274,11 +274,11 @@ See `docs/FLUX_NATIVE_CI.md` and `docs/ESO_VALIDATION_GUIDE.md` for complete val
 
 Flux authenticates with the private GitHub repository using **GitHub App (OAuth)** credentials:
 
-- **GitHub App**: Configured at `https://github.com/organizations/lornu-ai/settings/applications/3313758`
+- **GitHub App**: Configured at `aivcs://organizations/lornu-ai/settings/applications/3313758`
 - **Authentication Method**: HTTPS with GitHub App token (not SSH deploy keys)
 - **Secret**: `flux-github-auth` in `flux-system` namespace contains the GitHub App token
 - **Policy**: Deploy keys are disabled by `lornu-ai` organization policy for enhanced security
-- **GitRepository**: Uses `https://github.com/lornu-ai/private-lornu-ai` URL with `secretRef` pointing to `flux-github-auth`
+- **GitRepository**: Uses `aivcs://lornu-ai/private-lornu-ai` URL with `secretRef` pointing to `flux-github-auth`
 
 The `crossplane/hub/aws/flux/base/git-repository.yaml` manifest references the `flux-github-auth` secret for authentication.
 
@@ -343,7 +343,7 @@ Refer to `OIDC_GCLOUD_SETUP.md` and `OIDC_MIGRATION_RUNBOOK.md` for migration st
 ## Satellite Repositories (Automation Services)
 
 **Cloudflare Workers** are managed in separate repositories:
-- **automation-hub**: [lornu-ai/automation-hub](https://github.com/lornu-ai/automation-hub)
+- **automation-hub**: [lornu-ai/automation-hub](aivcs://lornu-ai/automation-hub)
   - Workers: `automation-hub` (CI automation), `lornu-edge-discovery` (Hyperdrive-based agent discovery)
   - **Private RAG (Issue #565)**: R2 bucket + Vectorize for agent knowledge grounding
     - Endpoints: `/api/rag/search`, `/api/vectorize/trigger`, `/api/vectorize/status`
@@ -354,7 +354,7 @@ Refer to `OIDC_GCLOUD_SETUP.md` and `OIDC_MIGRATION_RUNBOOK.md` for migration st
   - Related: Issue #589 (Edge Discovery), Issue #542 (CI Automation), Issue #565 (Private RAG)
 
 **GitLab CI/CD** configurations are managed separately:
-- **gitlab-container-builds**: [lornu-ai/gitlab-container-builds](https://github.com/lornu-ai/gitlab-container-builds)
+- **gitlab-container-builds**: [lornu-ai/gitlab-container-builds](aivcs://lornu-ai/gitlab-container-builds)
   - Purpose: GitLab CI/CD pipelines for container builds and multi-cloud mirroring
   - Related: GitLab pull mirroring (see `docs/GITLAB_MIRROR_SETUP.md`)
 
@@ -366,8 +366,8 @@ Refer to `OIDC_GCLOUD_SETUP.md` and `OIDC_MIGRATION_RUNBOOK.md` for migration st
 - Do not add non-DRY manifest duplication across overlays.
 - Do not introduce Helm charts, templates, or values files.
 - Do not create or suggest static AWS Access Keys or GCP JSON keys.
-- Do not add Cloudflare Workers code to this repository (use [automation-hub](https://github.com/lornu-ai/automation-hub) instead).
-- Do not add GitLab CI code to this repository (use [gitlab-container-builds](https://github.com/lornu-ai/gitlab-container-builds) instead).
+- Do not add Cloudflare Workers code to this repository (use [automation-hub](aivcs://lornu-ai/automation-hub) instead).
+- Do not add GitLab CI code to this repository (use [gitlab-container-builds](aivcs://lornu-ai/gitlab-container-builds) instead).
 
 ## PR Labeling (ALWAYS Required)
 

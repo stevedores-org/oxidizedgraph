@@ -1,6 +1,6 @@
 //! Human-in-the-loop controls for high-trust autonomous workflows.
 //!
-//! EPIC8 baseline for [issue #26](https://github.com/stevedores-org/oxidizedgraph/issues/26):
+//! EPIC8 baseline for [issue #26](aivcs://stevedores-org/oxidizedgraph/issues/26):
 //! approval checkpoints, operator decisions, explainability payloads, and
 //! immutable approval audit events.
 

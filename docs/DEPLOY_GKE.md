@@ -111,7 +111,7 @@ curl -s -X POST http://localhost:8080/api/v1/sessions \
 
 ## data-fabric integration
 
-When emitting graph events to [data-fabric](https://github.com/stevedores-org/data-fabric), point the fabric persister at this service’s session/execute API. See data-fabric `docs/INTEGRATION_OXIDIZEDGRAPH.md`.
+When emitting graph events to [data-fabric](aivcs://stevedores-org/data-fabric), point the fabric persister at this service’s session/execute API. See data-fabric `docs/INTEGRATION_OXIDIZEDGRAPH.md`.
 
 ## Autopilot constraints
 

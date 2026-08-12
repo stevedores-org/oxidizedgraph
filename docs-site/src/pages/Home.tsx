@@ -12,7 +12,7 @@ export default function Home() {
         </p>
         <div className="flex gap-3 mt-6">
           <Link to="/getting-started" className="bg-violet-500 hover:bg-violet-600 text-white font-semibold px-5 py-2.5 rounded-lg transition text-sm">Get Started</Link>
-          <a href="https://github.com/stevedores-org/oxidizedgraph" className="border border-zinc-700 hover:border-zinc-500 px-5 py-2.5 rounded-lg transition text-sm text-zinc-300">GitHub</a>
+          <a href="aivcs://stevedores-org/oxidizedgraph" className="border border-zinc-700 hover:border-zinc-500 px-5 py-2.5 rounded-lg transition text-sm text-zinc-300">GitHub</a>
           <a href="https://crates.io/crates/oxidizedgraph" className="border border-zinc-700 hover:border-zinc-500 px-5 py-2.5 rounded-lg transition text-sm text-zinc-300">crates.io</a>
         </div>
       </div>

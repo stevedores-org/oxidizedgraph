@@ -50,7 +50,7 @@ export default function Sidebar() {
         ))}
       </div>
       <div className="px-5 py-4 border-t border-zinc-800/60 text-xs text-zinc-500 flex gap-3">
-        <a href="https://github.com/stevedores-org/oxidizedgraph" className="hover:text-violet-400 transition">GitHub</a>
+        <a href="aivcs://stevedores-org/oxidizedgraph" className="hover:text-violet-400 transition">GitHub</a>
         <span className="text-zinc-700">&middot;</span>
         <a href="https://crates.io/crates/oxidizedgraph" className="hover:text-violet-400 transition">crates.io</a>
         <span className="text-zinc-700">&middot;</span>
