@@ -39,6 +39,7 @@
 //! ```
 
 #![warn(missing_docs)]
+#![allow(clippy::double_must_use)]
 
 // Core modules
 pub mod a2a;
