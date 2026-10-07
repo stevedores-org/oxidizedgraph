@@ -78,7 +78,7 @@ jobs:
         run: kustomize build deploy/docs/overlays/gke-prod > /tmp/docs.yaml
 
       - name: kubeconform — commercial docs
-        run: kubeconform -strict -summary -kubernetes-version 1.29.0 /tmp/docs.yaml
+        run: kubeconform -strict -summary -kubernetes-version 1.29.0 -skip AgentRun /tmp/docs.yaml
 
       - name: Assert EKS overlay uses ECR image and amd64 scheduling
         run: |

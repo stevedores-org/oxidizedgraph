@@ -104,9 +104,16 @@ impl SandboxExecutor for SubprocessSandbox {
             self.validate_working_dir(dir)?;
         }
 
-        let mut cmd = Command::new("sh");
-        cmd.arg("-c")
-            .arg(command)
+        let args = shlex::split(command).ok_or_else(|| {
+            SandboxError::CommandFailed(format!("Invalid command syntax: '{command}'"))
+        })?;
+
+        if args.is_empty() {
+            return Err(SandboxError::CommandFailed("Empty command".to_string()));
+        }
+
+        let mut cmd = Command::new(&args[0]);
+        cmd.args(&args[1..])
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .kill_on_drop(true);
@@ -149,5 +156,21 @@ mod tests {
             SubprocessSandbox::new(SandboxConfig::with_timeout(Duration::from_millis(50)));
         let result = sandbox.run("sleep 2", None).await;
         assert!(matches!(result, Err(SandboxError::Timeout(_))));
+    }
+
+    #[tokio::test]
+    async fn test_subprocess_sandbox_prevents_command_injection() {
+        let sandbox = SubprocessSandbox::new(SandboxConfig::with_timeout(Duration::from_secs(5)));
+        // With shlex, `echo hello; echo injected` passes "hello;" and "echo" and "injected" as arguments to `echo`.
+        // It does not execute the second echo command via shell chaining.
+        let out = sandbox.run("echo hello; echo injected", None).await.unwrap();
+        assert_eq!(out, "hello; echo injected");
+    }
+
+    #[tokio::test]
+    async fn test_subprocess_sandbox_invalid_syntax() {
+        let sandbox = SubprocessSandbox::new(SandboxConfig::with_timeout(Duration::from_secs(5)));
+        let result = sandbox.run("echo \"unclosed quote", None).await;
+        assert!(matches!(result, Err(SandboxError::CommandFailed(_))));
     }
 }
