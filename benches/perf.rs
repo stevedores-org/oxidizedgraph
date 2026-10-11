@@ -1,6 +1,6 @@
 use criterion::{black_box, criterion_group, criterion_main, BatchSize, Criterion};
 use oxidizedgraph::prelude::*;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use tokio::runtime::Runtime;
 
 struct RouteNode {
@@ -210,12 +210,46 @@ fn benchmark_context_pack(c: &mut Criterion) {
     });
 }
 
+fn benchmark_scheduler_plan_failure_check(c: &mut Criterion) {
+    let runtime = Runtime::new().unwrap();
+    let mut plan = EpicPlan::new("perf_goal");
+    for i in 0..100 {
+        let id = format!("task_{i}");
+        let mut task = Task::new(&id, format!("Task {i}"), "Description");
+        if i % 5 == 0 {
+            task.status = TaskStatus::Failed;
+            task.error = Some(format!("Error in task {i}"));
+        }
+        plan.add_task(task);
+    }
+
+    let scheduler_node = SchedulerNode::new("scheduler");
+
+    c.bench_function("scheduler_plan_failure_check_100_tasks", |b| {
+        b.iter_batched(
+            || {
+                let state = Arc::new(RwLock::new(AgentState::new()));
+                {
+                    let mut guard = state.write().unwrap();
+                    guard.set_context("epic_plan", plan.clone());
+                }
+                state
+            },
+            |state| {
+                runtime.block_on(async { black_box(scheduler_node.execute(state).await.unwrap()) })
+            },
+            BatchSize::SmallInput,
+        )
+    });
+}
+
 criterion_group!(
     benches,
     benchmark_graph_compile,
     benchmark_graph_invoke,
     benchmark_checkpoint_save,
     benchmark_event_dispatch,
-    benchmark_context_pack
+    benchmark_context_pack,
+    benchmark_scheduler_plan_failure_check
 );
 criterion_main!(benches);
