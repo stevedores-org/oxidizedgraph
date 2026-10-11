@@ -163,7 +163,10 @@ mod tests {
         let sandbox = SubprocessSandbox::new(SandboxConfig::with_timeout(Duration::from_secs(5)));
         // With shlex, `echo hello; echo injected` passes "hello;" and "echo" and "injected" as arguments to `echo`.
         // It does not execute the second echo command via shell chaining.
-        let out = sandbox.run("echo hello; echo injected", None).await.unwrap();
+        let out = sandbox
+            .run("echo hello; echo injected", None)
+            .await
+            .unwrap();
         assert_eq!(out, "hello; echo injected");
     }
 

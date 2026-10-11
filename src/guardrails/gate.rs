@@ -10,6 +10,14 @@ use crate::guardrails::findings::{GateCheck, GateResult, ReviewFinding};
 use crate::guardrails::risk::{ChangeRisk, RiskClassifier};
 use crate::state::SharedState;
 
+use std::collections::HashSet;
+
+/// Default list of executables allowed to run as quality gates.
+pub const DEFAULT_ALLOWED_PROGRAMS: &[&str] = &[
+    "cargo", "git", "npm", "yarn", "pnpm", "bun", "pytest", "python", "python3", "go", "make",
+    "clippy", "ruff", "flake8", "deno", "gradle", "mvn", "dotnet", "true", "false", "echo",
+];
+
 /// Specification for a command to run as a quality gate.
 #[derive(Clone, Debug)]
 pub struct CommandSpec {
@@ -21,6 +29,69 @@ pub struct CommandSpec {
     pub args: Vec<String>,
 }
 
+impl CommandSpec {
+    /// Validates the command spec against security restrictions and allowed programs.
+    pub fn validate(&self, allowed_programs: &HashSet<String>) -> Result<(), String> {
+        let prog = self.program.trim();
+        if prog.is_empty() {
+            return Err("Program name cannot be empty".to_string());
+        }
+
+        if prog.contains('/') || prog.contains('\\') || prog.contains("..") {
+            return Err(format!(
+                "Program name contains invalid path characters: '{}'",
+                self.program
+            ));
+        }
+
+        if prog.contains('\0')
+            || prog.chars().any(|c| {
+                c.is_whitespace() || c == ';' || c == '&' || c == '|' || c == '`' || c == '$'
+            })
+        {
+            return Err(format!(
+                "Program name contains invalid or metacharacters: '{}'",
+                self.program
+            ));
+        }
+
+        let lower_prog = prog.to_lowercase();
+        let forbidden_shells = [
+            "sh",
+            "bash",
+            "zsh",
+            "ksh",
+            "csh",
+            "tcsh",
+            "cmd",
+            "cmd.exe",
+            "powershell",
+            "pwsh",
+        ];
+        if forbidden_shells.contains(&lower_prog.as_str()) {
+            return Err(format!(
+                "Shell executable is not permitted as quality gate program: '{}'",
+                self.program
+            ));
+        }
+
+        if !allowed_programs.contains(prog) {
+            return Err(format!(
+                "Program '{}' is not in the allowed commands list for quality gates",
+                self.program
+            ));
+        }
+
+        for (i, arg) in self.args.iter().enumerate() {
+            if arg.contains('\0') {
+                return Err(format!("Argument at index {} contains null byte", i));
+            }
+        }
+
+        Ok(())
+    }
+}
+
 /// Runs shell commands (injectable for tests).
 #[async_trait]
 pub trait CommandRunner: Send + Sync {
@@ -28,13 +99,60 @@ pub trait CommandRunner: Send + Sync {
     async fn run(&self, spec: &CommandSpec) -> Result<(i32, String), String>;
 }
 
-/// Default command runner using tokio subprocess.
-#[derive(Clone, Debug, Default)]
-pub struct ProcessCommandRunner;
+/// Default command runner using tokio subprocess with binary validation.
+#[derive(Clone, Debug)]
+pub struct ProcessCommandRunner {
+    allowed_programs: HashSet<String>,
+}
+
+impl ProcessCommandRunner {
+    /// Create a new `ProcessCommandRunner` with default allowed programs.
+    pub fn new() -> Self {
+        let allowed = DEFAULT_ALLOWED_PROGRAMS
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+        Self {
+            allowed_programs: allowed,
+        }
+    }
+
+    /// Create with custom allowed programs.
+    #[allow(dead_code)]
+    pub fn with_allowed_programs<I, S>(programs: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        Self {
+            allowed_programs: programs.into_iter().map(|s| s.into()).collect(),
+        }
+    }
+
+    /// Add an allowed program name to the runner.
+    #[allow(dead_code)]
+    pub fn allow_program(mut self, program: impl Into<String>) -> Self {
+        self.allowed_programs.insert(program.into());
+        self
+    }
+
+    /// Validate command specification before execution.
+    pub fn validate_spec(&self, spec: &CommandSpec) -> Result<(), String> {
+        spec.validate(&self.allowed_programs)
+    }
+}
+
+impl Default for ProcessCommandRunner {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 #[async_trait]
 impl CommandRunner for ProcessCommandRunner {
     async fn run(&self, spec: &CommandSpec) -> Result<(i32, String), String> {
+        self.validate_spec(spec)?;
+
         let output = tokio::process::Command::new(&spec.program)
             .args(&spec.args)
             .output()
@@ -135,7 +253,7 @@ pub struct QualityGateNode {
 impl QualityGateNode {
     /// Create a quality gate node with the default process runner.
     pub fn new(id: impl Into<String>, config: QualityGateConfig) -> Self {
-        Self::with_runner(id, config, Arc::new(ProcessCommandRunner))
+        Self::with_runner(id, config, Arc::new(ProcessCommandRunner::default()))
     }
 
     /// Create with a custom command runner (for tests).
@@ -387,5 +505,76 @@ mod tests {
             .get_context::<crate::guardrails::risk::MergeBlocker>("merge_blocker")
             .expect("merge_blocker");
         assert!(!blocker.blocked);
+    }
+
+    #[tokio::test]
+    async fn test_process_command_runner_security_validation() {
+        let runner = ProcessCommandRunner::default();
+
+        // Allowed program succeeds validation
+        let valid_spec = CommandSpec {
+            name: "test_cargo".to_string(),
+            program: "cargo".to_string(),
+            args: vec!["check".to_string()],
+        };
+        assert!(runner.validate_spec(&valid_spec).is_ok());
+
+        // Unallowed program fails
+        let unallowed_spec = CommandSpec {
+            name: "test_malicious".to_string(),
+            program: "malicious_binary".to_string(),
+            args: vec![],
+        };
+        assert!(runner.validate_spec(&unallowed_spec).is_err());
+
+        // Path separator in program fails
+        let path_sep_spec = CommandSpec {
+            name: "test_path".to_string(),
+            program: "/usr/bin/cargo".to_string(),
+            args: vec![],
+        };
+        assert!(runner.validate_spec(&path_sep_spec).is_err());
+
+        // Shell binary fails
+        let shell_spec = CommandSpec {
+            name: "test_sh".to_string(),
+            program: "sh".to_string(),
+            args: vec!["-c".to_string(), "whoami".to_string()],
+        };
+        assert!(runner.validate_spec(&shell_spec).is_err());
+
+        // Shell metacharacters fail
+        let meta_spec = CommandSpec {
+            name: "test_meta".to_string(),
+            program: "cargo;whoami".to_string(),
+            args: vec![],
+        };
+        assert!(runner.validate_spec(&meta_spec).is_err());
+
+        // Null byte in args fails
+        let null_arg_spec = CommandSpec {
+            name: "test_null".to_string(),
+            program: "cargo".to_string(),
+            args: vec!["check\0".to_string()],
+        };
+        assert!(runner.validate_spec(&null_arg_spec).is_err());
+    }
+
+    #[tokio::test]
+    async fn test_process_command_runner_custom_allowed() {
+        let runner = ProcessCommandRunner::with_allowed_programs(["custom_check"])
+            .allow_program("another_check");
+        let spec1 = CommandSpec {
+            name: "test_custom1".to_string(),
+            program: "custom_check".to_string(),
+            args: vec![],
+        };
+        let spec2 = CommandSpec {
+            name: "test_custom2".to_string(),
+            program: "another_check".to_string(),
+            args: vec![],
+        };
+        assert!(runner.validate_spec(&spec1).is_ok());
+        assert!(runner.validate_spec(&spec2).is_ok());
     }
 }
