@@ -43,13 +43,13 @@ impl Scheduler {
 
     /// Check if the dependency graph of the plan contains cycles.
     pub fn has_cycles(&self, plan: &EpicPlan) -> bool {
-        let mut visited = HashMap::new(); // 0 = unvisited, 1 = visiting, 2 = visited
+        let mut visited: HashMap<&str, u8> = HashMap::new(); // 0 = unvisited, 1 = visiting, 2 = visited
 
-        fn dfs(node: &str, plan: &EpicPlan, visited: &mut HashMap<String, u8>) -> bool {
-            visited.insert(node.to_string(), 1);
+        fn dfs<'a>(node: &'a str, plan: &'a EpicPlan, visited: &mut HashMap<&'a str, u8>) -> bool {
+            visited.insert(node, 1);
             if let Some(task) = plan.get_task(node) {
                 for dep in &task.dependencies {
-                    let state = visited.get(dep).copied().unwrap_or(0);
+                    let state = visited.get(dep.as_str()).copied().unwrap_or(0);
                     if state == 1 {
                         return true; // Cycle detected
                     } else if state == 0 && dfs(dep, plan, visited) {
@@ -57,12 +57,12 @@ impl Scheduler {
                     }
                 }
             }
-            visited.insert(node.to_string(), 2);
+            visited.insert(node, 2);
             false
         }
 
         for id in plan.tasks.keys() {
-            if visited.get(id).copied().unwrap_or(0) == 0 && dfs(id, plan, &mut visited) {
+            if visited.get(id.as_str()).copied().unwrap_or(0) == 0 && dfs(id, plan, &mut visited) {
                 return true;
             }
         }
