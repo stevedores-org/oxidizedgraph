@@ -152,16 +152,14 @@ impl NodeExecutor for SchedulerNode {
         }
 
         // Check for any currently failed tasks to trigger auto-replan
-        let mut has_failures = false;
-        let mut failed_ids = Vec::new();
-        for task in plan.tasks.values() {
-            if task.status == TaskStatus::Failed {
-                has_failures = true;
-                failed_ids.push(task.id.clone());
-            }
-        }
+        let failed_tasks: Vec<Task> = plan
+            .tasks
+            .values()
+            .filter(|task| task.status == TaskStatus::Failed)
+            .cloned()
+            .collect();
 
-        if has_failures {
+        if !failed_tasks.is_empty() {
             let mut attempts: HashMap<String, usize> =
                 guard.get_context("task_attempts").unwrap_or_default();
             let mut history: Vec<RecoveryRecord> =
@@ -169,15 +167,12 @@ impl NodeExecutor for SchedulerNode {
             let mut replanned_all = true;
             let mut replanned_any = false;
 
-            for failed_id in failed_ids {
-                let task = plan.get_task(&failed_id).unwrap().clone();
-                let error_msg = task
-                    .error
-                    .clone()
-                    .unwrap_or_else(|| "Unknown error".to_string());
+            for task in failed_tasks {
+                let failed_id = &task.id;
+                let error_msg = task.error.as_deref().unwrap_or("Unknown error");
 
                 if self.self_healing_enabled {
-                    let class = classify_failure(&error_msg);
+                    let class = classify_failure(error_msg);
                     let policy =
                         self.retry_policies
                             .get(&class)
@@ -190,7 +185,7 @@ impl NodeExecutor for SchedulerNode {
                                 FailureClass::Unknown => RetryPolicy::default(),
                             });
 
-                    let current_attempts = *attempts.get(&failed_id).unwrap_or(&0);
+                    let current_attempts = *attempts.get(failed_id).unwrap_or(&0);
 
                     if current_attempts < policy.max_attempts {
                         let attempt = current_attempts + 1;
@@ -198,7 +193,7 @@ impl NodeExecutor for SchedulerNode {
 
                         // If a manual recovery is registered, use it, else generate dynamically
                         let recovery = if let Some(manual_rec) =
-                            self.auto_replan_recoveries.get(&failed_id).cloned()
+                            self.auto_replan_recoveries.get(failed_id).cloned()
                         {
                             manual_rec
                         } else {
@@ -216,7 +211,7 @@ impl NodeExecutor for SchedulerNode {
                             failed_id.clone(),
                             attempt,
                             class,
-                            error_msg.clone(),
+                            error_msg.to_string(),
                             "Inject recovery task",
                             format!(
                                 "Classified as {:?}. Injected recovery task {}/{} attempts.",
@@ -235,14 +230,14 @@ impl NodeExecutor for SchedulerNode {
                             policy.max_attempts
                         );
 
-                        plan.inject_recovery_task(&failed_id, recovery);
+                        plan.inject_recovery_task(failed_id, recovery);
                         replanned_any = true;
                     } else {
                         let record = RecoveryRecord::new(
                             failed_id.clone(),
                             current_attempts,
                             class,
-                            error_msg.clone(),
+                            error_msg.to_string(),
                             "Halted (max attempts)",
                             format!(
                                 "Exceeded max attempts ({}) for failure class {:?}",
@@ -264,8 +259,8 @@ impl NodeExecutor for SchedulerNode {
                     }
                 } else {
                     // Backwards-compatible behavior
-                    if let Some(recovery) = self.auto_replan_recoveries.get(&failed_id).cloned() {
-                        plan.inject_recovery_task(&failed_id, recovery);
+                    if let Some(recovery) = self.auto_replan_recoveries.get(failed_id).cloned() {
+                        plan.inject_recovery_task(failed_id, recovery);
                         replanned_any = true;
                     } else {
                         replanned_all = false;
