@@ -243,6 +243,26 @@ fn benchmark_scheduler_plan_failure_check(c: &mut Criterion) {
     });
 }
 
+fn benchmark_scheduler_has_cycles(c: &mut Criterion) {
+    let scheduler = Scheduler::new();
+    let mut plan = EpicPlan::new("perf_cycles_goal");
+    for i in 0..200 {
+        let id = format!("task_{i}");
+        let mut task = Task::new(&id, format!("Task {i}"), "Description");
+        if i > 0 {
+            task = task.depends_on(format!("task_{}", i - 1));
+        }
+        if i > 1 {
+            task = task.depends_on(format!("task_{}", i - 2));
+        }
+        plan.add_task(task);
+    }
+
+    c.bench_function("scheduler_has_cycles_200_tasks", |b| {
+        b.iter(|| black_box(scheduler.has_cycles(black_box(&plan))))
+    });
+}
+
 criterion_group!(
     benches,
     benchmark_graph_compile,
@@ -250,6 +270,7 @@ criterion_group!(
     benchmark_checkpoint_save,
     benchmark_event_dispatch,
     benchmark_context_pack,
-    benchmark_scheduler_plan_failure_check
+    benchmark_scheduler_plan_failure_check,
+    benchmark_scheduler_has_cycles
 );
 criterion_main!(benches);
