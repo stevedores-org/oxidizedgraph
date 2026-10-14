@@ -577,4 +577,27 @@ mod tests {
         assert!(runner.validate_spec(&spec1).is_ok());
         assert!(runner.validate_spec(&spec2).is_ok());
     }
+
+    #[tokio::test]
+    async fn test_quality_gate_node_new() {
+        let config = QualityGateConfig {
+            checks: vec![CommandSpec {
+                name: "true_check".to_string(),
+                program: "true".to_string(),
+                args: vec![],
+            }],
+            block_on_failure: true,
+        };
+        let node = QualityGateNode::new("custom_quality_gate", config);
+
+        assert_eq!(node.id(), "custom_quality_gate");
+        assert_eq!(
+            node.description(),
+            Some("Runs lint/typecheck/test gates and routes on pass/fail/risk")
+        );
+
+        let state = Arc::new(RwLock::new(AgentState::new()));
+        let output = node.execute(state.clone()).await.unwrap();
+        assert_eq!(output.target(), Some("passed"));
+    }
 }
