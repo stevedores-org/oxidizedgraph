@@ -464,7 +464,6 @@ mod tests {
         let elapsed = start.elapsed();
 
         assert!(result.is_err());
-        // Should return quickly due to fail-fast, not wait for the 1000ms subgraph
         assert!(elapsed < Duration::from_millis(900));
     }
 
