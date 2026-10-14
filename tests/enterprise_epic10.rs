@@ -19,10 +19,13 @@ fn tenant_boundary_blocks_cross_tenant_operator() {
 #[test]
 fn secret_redactor_prevents_log_exposure() {
     let redactor = SecretRedactor::enterprise_default();
-    let raw = "api_key=not-for-logs token=abc123";
+    let raw = "api_key=not-for-logs\nConnected with gho_1234567890abcdefghijklmnopqrstuvwxyz and AKIAIOSFODNN7EXAMPLE";
     let sanitized = redactor.redact(raw);
     assert!(!sanitized.contains("not-for-logs"));
+    assert!(!sanitized.contains("gho_1234567890abcdefghijklmnopqrstuvwxyz"));
+    assert!(!sanitized.contains("AKIAIOSFODNN7EXAMPLE"));
     assert!(sanitized.contains("[REDACTED]"));
+    assert!(sanitized.contains("[REDACTED_TOKEN]"));
 }
 
 #[test]

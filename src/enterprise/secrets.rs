@@ -122,11 +122,26 @@ impl SecretRedactor {
                 }
             }
         }
-        // Redact ghs_ and ghp_ GitHub tokens
-        for token in find_tokens(output.as_str(), "ghs_")
-            .into_iter()
-            .chain(find_tokens(output.as_str(), "ghp_"))
-        {
+        // Redact known secret token prefixes (GitHub, AWS, Slack, OpenAI/Stripe, etc.)
+        let prefixes = [
+            "ghp_",
+            "ghs_",
+            "gho_",
+            "ghu_",
+            "ghr_",
+            "github_pat_",
+            "AKIA",
+            "ASIA",
+            "xoxb-",
+            "xoxp-",
+            "xoxa-",
+            "xoxr-",
+            "sk-",
+            "sk_live_",
+            "sk_test_",
+            "rk_live_",
+        ];
+        for token in find_tokens(output.as_str(), &prefixes) {
             output = output.replace(&token, "[REDACTED_TOKEN]");
         }
         output
@@ -139,14 +154,27 @@ impl SecretRedactor {
     }
 }
 
-fn find_tokens(input: &str, prefix: &str) -> Vec<String> {
+fn find_tokens(input: &str, prefixes: &[&str]) -> Vec<String> {
     let mut tokens = Vec::new();
-    for word in input.split_whitespace() {
-        if word.starts_with(prefix) {
-            tokens.push(
-                word.trim_matches(|c: char| !c.is_alphanumeric() && c != '_')
-                    .to_string(),
-            );
+    let mut sorted_prefixes = prefixes.to_vec();
+    sorted_prefixes.sort_by_key(|p| std::cmp::Reverse(p.len()));
+
+    for &prefix in &sorted_prefixes {
+        let mut start_search = 0;
+        while let Some(rel_idx) = input[start_search..].find(prefix) {
+            let idx = start_search + rel_idx;
+            let tail = &input[idx..];
+            let token_len = tail
+                .chars()
+                .take_while(|c| c.is_alphanumeric() || *c == '_' || *c == '-')
+                .map(|c| c.len_utf8())
+                .sum::<usize>();
+            let raw_token = &tail[..token_len];
+            let token = raw_token.trim_end_matches(['_', '-']);
+            if token.len() > prefix.len() && !tokens.contains(&token.to_string()) {
+                tokens.push(token.to_string());
+            }
+            start_search = idx + prefix.len();
         }
     }
     tokens
@@ -173,6 +201,40 @@ mod tests {
         assert!(!sanitized.contains("supersecret123"));
         assert!(!sanitized.contains("ghs_abc123token"));
         assert!(sanitized.contains("[REDACTED]"));
+    }
+
+    #[test]
+    fn test_redact_all_github_tokens() {
+        let redactor = SecretRedactor::enterprise_default();
+        let tokens = [
+            "ghp_1234567890abcdefghijklmnopqrstuvwxyz",
+            "ghs_1234567890abcdefghijklmnopqrstuvwxyz",
+            "gho_1234567890abcdefghijklmnopqrstuvwxyz",
+            "ghu_1234567890abcdefghijklmnopqrstuvwxyz",
+            "ghr_1234567890abcdefghijklmnopqrstuvwxyz",
+            "github_pat_11ABCDEFG0123456789_abcdefghijklmnopqrstuvwxyz1234567890",
+        ];
+        for token in tokens {
+            let input = format!("Found token {token} in log output.");
+            let sanitized = redactor.redact(&input);
+            assert!(
+                !sanitized.contains(token),
+                "Failed to redact token: {token}"
+            );
+            assert!(sanitized.contains("[REDACTED_TOKEN]"));
+        }
+    }
+
+    #[test]
+    fn test_redact_cloud_api_tokens() {
+        let redactor = SecretRedactor::enterprise_default();
+        let input = "aws_key=AKIAIOSFODNN7EXAMPLE slack=xoxb-1234-5678-abcd openai=sk-proj-1234567890abcdef stripe=sk_live_12345abcdef";
+        let sanitized = redactor.redact(input);
+        assert!(!sanitized.contains("AKIAIOSFODNN7EXAMPLE"));
+        assert!(!sanitized.contains("xoxb-1234-5678-abcd"));
+        assert!(!sanitized.contains("sk-proj-1234567890abcdef"));
+        assert!(!sanitized.contains("sk_live_12345abcdef"));
+        assert!(sanitized.contains("[REDACTED_TOKEN]"));
     }
 
     #[test]
