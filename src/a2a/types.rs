@@ -238,3 +238,23 @@ impl AgentCard {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_task_state_is_terminal() {
+        // Terminal states
+        assert!(TaskState::TaskStateCompleted.is_terminal());
+        assert!(TaskState::TaskStateFailed.is_terminal());
+        assert!(TaskState::TaskStateCanceled.is_terminal());
+        assert!(TaskState::TaskStateRejected.is_terminal());
+
+        // Non-terminal states
+        assert!(!TaskState::TaskStateSubmitted.is_terminal());
+        assert!(!TaskState::TaskStateWorking.is_terminal());
+        assert!(!TaskState::TaskStateInputRequired.is_terminal());
+        assert!(!TaskState::TaskStateAuthRequired.is_terminal());
+    }
+}
