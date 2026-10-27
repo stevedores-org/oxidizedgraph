@@ -263,6 +263,27 @@ fn benchmark_scheduler_has_cycles(c: &mut Criterion) {
     });
 }
 
+fn benchmark_governance_symlink_sync_all(c: &mut Criterion) {
+    use oxidizedgraph::governance::SymlinkManager;
+    use tempfile::tempdir;
+
+    c.bench_function("governance_symlink_sync_all", |b| {
+        b.iter_batched(
+            || {
+                let dir = tempdir().unwrap();
+                let master_path = dir.path().join("AGENTS.md");
+                std::fs::write(&master_path, "Master Manifest Content").unwrap();
+                let mgr = SymlinkManager::default(dir.path());
+                (dir, mgr)
+            },
+            |(_dir, mgr)| {
+                black_box(mgr.sync_all().unwrap());
+            },
+            BatchSize::SmallInput,
+        )
+    });
+}
+
 criterion_group!(
     benches,
     benchmark_graph_compile,
@@ -271,6 +292,7 @@ criterion_group!(
     benchmark_event_dispatch,
     benchmark_context_pack,
     benchmark_scheduler_plan_failure_check,
-    benchmark_scheduler_has_cycles
+    benchmark_scheduler_has_cycles,
+    benchmark_governance_symlink_sync_all
 );
 criterion_main!(benches);
