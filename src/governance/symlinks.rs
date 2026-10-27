@@ -58,14 +58,26 @@ impl SymlinkManager {
 
     /// Check the status of a specific target
     pub fn check_status(&self, target_rel_path: &Path) -> io::Result<SymlinkStatus> {
-        let full_path = self.base_dir.join(target_rel_path);
         let master_full_path = self.base_dir.join(&self.master_file);
+        let canonical_master = master_full_path
+            .canonicalize()
+            .unwrap_or_else(|_| master_full_path.clone());
+        self.check_status_internal(target_rel_path, &canonical_master)
+    }
 
-        if !full_path.exists() && !full_path.is_symlink() {
-            return Ok(SymlinkStatus::Missing);
-        }
+    fn check_status_internal(
+        &self,
+        target_rel_path: &Path,
+        canonical_master: &Path,
+    ) -> io::Result<SymlinkStatus> {
+        let full_path = self.base_dir.join(target_rel_path);
 
-        let metadata = fs::symlink_metadata(&full_path)?;
+        let metadata = match fs::symlink_metadata(&full_path) {
+            Ok(meta) => meta,
+            Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(SymlinkStatus::Missing),
+            Err(e) => return Err(e),
+        };
+
         if !metadata.is_symlink() {
             return Ok(SymlinkStatus::NotASymlink);
         }
@@ -73,9 +85,6 @@ impl SymlinkManager {
         let target = fs::read_link(&full_path)?;
 
         // Target may be relative to the symlink's directory, so we canonicalize both
-        let canonical_master = master_full_path
-            .canonicalize()
-            .unwrap_or_else(|_| master_full_path.clone());
         let canonical_target = if target.is_absolute() {
             target.clone()
         } else {
@@ -100,14 +109,26 @@ impl SymlinkManager {
 
     /// Ensure a symlink points to the master file
     pub fn sync_symlink(&self, target_rel_path: &Path) -> io::Result<()> {
-        let full_path = self.base_dir.join(target_rel_path);
         let master_full_path = self.base_dir.join(&self.master_file);
+        let canonical_master = master_full_path
+            .canonicalize()
+            .unwrap_or_else(|_| master_full_path.clone());
+        self.sync_symlink_internal(target_rel_path, &master_full_path, &canonical_master)
+    }
+
+    fn sync_symlink_internal(
+        &self,
+        target_rel_path: &Path,
+        master_full_path: &Path,
+        canonical_master: &Path,
+    ) -> io::Result<()> {
+        let full_path = self.base_dir.join(target_rel_path);
 
         if let Some(parent) = full_path.parent() {
             fs::create_dir_all(parent)?;
         }
 
-        let status = self.check_status(target_rel_path)?;
+        let status = self.check_status_internal(target_rel_path, canonical_master)?;
         match status {
             SymlinkStatus::Valid => return Ok(()),
             SymlinkStatus::NotASymlink
@@ -120,23 +141,30 @@ impl SymlinkManager {
 
         // Compute relative path from the symlink directory to the master file
         let src_dir = full_path.parent().unwrap_or(&self.base_dir);
-        let relative_target = pathdiff::diff_paths(&master_full_path, src_dir)
-            .unwrap_or_else(|| master_full_path.clone());
+        let relative_target = pathdiff::diff_paths(master_full_path, src_dir)
+            .unwrap_or_else(|| master_full_path.to_path_buf());
 
         symlink_file(&relative_target, &full_path)
     }
 
     /// Synchronize all known targets
     pub fn sync_all(&self) -> io::Result<Vec<(PathBuf, Result<(), io::Error>)>> {
-        let mut results = Vec::new();
-        for target in KNOWN_TARGETS {
-            if target == &self.master_file.to_string_lossy() {
+        let master_lossy = self.master_file.to_string_lossy();
+        let master_full_path = self.base_dir.join(&self.master_file);
+        let canonical_master = master_full_path
+            .canonicalize()
+            .unwrap_or_else(|_| master_full_path.clone());
+
+        let mut results = Vec::with_capacity(KNOWN_TARGETS.len());
+        for &target in KNOWN_TARGETS {
+            if target == master_lossy {
                 continue;
             }
             let path = PathBuf::from(target);
-            let res = self.sync_symlink(&path);
+            let res = self.sync_symlink_internal(&path, &master_full_path, &canonical_master);
             results.push((path, res));
         }
+
         Ok(results)
     }
 }
